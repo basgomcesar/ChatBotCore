@@ -1,0 +1,27 @@
+# Node.js dependencies
+node_modules/
+
+# Log files
+*.log
+
+# Environment variables file
+.env
+
+# npm package-lock file (si no lo necesitas versionar)
+package-lock.json
+
+# Sistema operativo
+.DS_Store  # Para MacOS
+Thumbs.db  # Para Windows
+
+# Archivos de editor
+.idea/        # JetBrains (IntelliJ, WebStorm, etc.)
+.vscode/      # Visual Studio Code
+*.swp        # Archivos temporales de vim
+
+# Archivos de compilación (si los tienes)
+dist/
+build/
+
+# Archivos de test
+coverage/
