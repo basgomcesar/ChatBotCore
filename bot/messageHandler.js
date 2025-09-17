@@ -17,14 +17,7 @@ module.exports = async (sock, m) => {
     const respuesta = await welcomeFlow.handle(from, text);
 
     if (respuesta) {
-      await sock.sendMessage(
-        from,
-        {
-          text: respuesta.text,
-          buttons: respuesta.buttons,
-          headerType: 3,
-        },
-      );
+      await sock.sendMessage(from, respuesta);
     }
   } catch (error) {
     console.error("Error procesando mensaje:", error);
