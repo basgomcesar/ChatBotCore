@@ -26,3 +26,4 @@ build/
 # Archivos de test
 coverage/
 auth_info/
+state/userState.json
