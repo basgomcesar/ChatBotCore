@@ -1,54 +1,86 @@
-const { FLOWS } = require("../../config/constants");
-const { BIENVENIDA, MENU,ERRORES } = require("./messages");
+const { FLOWS, USUARIOS } = require("../../config/constants");
+const {
+  BIENVENIDA,
+  MENU,
+  ERRORES,
+  PREGUNTAR_TIPO_USUARIO,
+} = require("./messages");
+const { detectUserType, isValidName } = require("../../utils/validations");
 
 // Centraliza los nombres de flujo
 const FLOW_NAME = FLOWS.BIENVENIDA.NAME;
 const STEPS = FLOWS.BIENVENIDA.STEPS;
 
+const menuRoutes = {
+  1: {
+    flow: FLOWS.REQUISITOS.NAME,
+    step: FLOWS.REQUISITOS.STEPS.REQUISITOS_INICIAL,
+  },
+  2: {
+    flow: FLOWS.SIMULACION.NAME,
+    step: FLOWS.SIMULACION.STEPS.SIMULACION_INICIAL,
+  },
+  3: {
+    flow: FLOWS.LLENADO_SOLICITUD.NAME,
+    step: FLOWS.LLENADO_SOLICITUD.STEPS.LLENADO_SOLICITUD_INICIAL,
+  },
+  4: {
+    flow: FLOWS.COMPROBANTE.NAME,
+    step: FLOWS.COMPROBANTE.STEPS.COMPROBANTE_INICIAL,
+  },
+  5: { flow: FLOWS.ASESOR.NAME, step: FLOWS.ASESOR.STEPS.ASESOR_INICIAL },
+  6: {
+    flow: FLOWS.PREGUNTAS_FRECUENTES.NAME,
+    step: FLOWS.PREGUNTAS_FRECUENTES.STEPS.PREGUNTAS_FRECUENTES_INICIAL,
+  },
+};
+
 const stepHandlers = {
   [STEPS.SALUDO_INICIAL]: async (userId, text, state) => ({
     reply: BIENVENIDA(),
-    newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_NOMBRE }
+    newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_NOMBRE },
   }),
-
   [STEPS.ESPERANDO_NOMBRE]: async (userId, text, state) => {
     const nombre = text.trim();
-    if (nombre.length < 2) {
+    if (isValidName(nombre)) {
       return {
-        reply: ERRORES.NOMBRE_INVALIDO,
-        newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_NOMBRE }
+        reply: PREGUNTAR_TIPO_USUARIO(nombre),
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.ESPREANDO_TIPO_USUARIO,
+          name: nombre,
+        },
       };
     }
     return {
-      reply: `¡Encantado de conocerte, *${nombre}*! 🙌\n${MENU(nombre)}`,
-      newState: { flow: FLOW_NAME, step: STEPS.MENU, name:nombre }
+      reply: ERRORES.NOMBRE_INVALIDO,
+      newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_NOMBRE },
     };
   },
-
-  [STEPS.MENU]: async (userId, text, state) => {
-    switch (text.trim()) {
-      case "1":
-        return {
-          reply: "📄 Estás entrando al flujo de *Requisitos y Formatos*.",
-          newState: { flow: FLOWS.REQUISITOS.NAME, step: FLOWS.REQUISITOS.STEPS.REQUISITOS_INICIAL }
-        };
-      case "2":
-        return {
-          reply: "📞 Te comunicaré con un agente de soporte.",
-          newState: { flow: "SOPORTE", step: "INICIO" } // Usa aquí tus constantes si tienes el flujo de soporte definido
-        };
-      case "3":
-        return {
-          reply: "👋 Gracias por comunicarte con *IPEBOT*. ¡Hasta pronto!",
-          newState: { flow: FLOW_NAME, step: STEPS.INICIO }
-        };
-      default:
-        return {
-          reply: `❌ Opción no válida. Elige una opción:\n\n${MENU}`,
-          newState: { flow: FLOW_NAME, step: STEPS.MENU }
-        };
+  [STEPS.ESPREANDO_TIPO_USUARIO]: async (userId, text, state) => {
+    const usuario = detectUserType(text);
+    if (usuario) {
+      return {
+        newState: { flow: FLOW_NAME, step: STEPS.MENU, userType: usuario },
+      };
     }
-  }
+    return {
+      reply: ERRORES.TIPO_USUARIO_INVALIDO(state.name),
+      newState: { flow: FLOW_NAME, step: STEPS.ESPREANDO_TIPO_USUARIO },
+    };
+  },
+  [STEPS.MENU]: async (userId, text, state) => {
+    return {
+      reply: MENU(state.name),
+      newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_OPCION },
+    };
+  },
+  [STEPS.ESPERANDO_OPCION]: async (userId, text, state) => {
+    const route = menuRoutes[text.trim()];
+    return route
+      ? { newState: route }
+      : { newState: { flow: FLOW_NAME, step: STEPS.MENU } };
+  },
 };
 
 module.exports = {
@@ -62,7 +94,7 @@ module.exports = {
     }
     return {
       reply: "❌ Paso no reconocido en el flujo de bienvenida.",
-      newState: { flow: FLOW_NAME, step: STEPS.SALUDO_INICIAL }
+      newState: { flow: FLOW_NAME, step: STEPS.SALUDO_INICIAL },
     };
-  }
+  },
 };
