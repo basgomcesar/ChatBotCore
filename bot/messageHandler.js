@@ -12,11 +12,11 @@ module.exports = async (sock, m) => {
       msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
     if (!text || from.endsWith("@g.us")) return;
-     if (!from.endsWith("2556@s.whatsapp.net")) return;
+    if (!from.endsWith("2556@s.whatsapp.net")) return;
 
     console.log(`📩 Mensaje de ${from}: ${text}`);
 
-    let reply, newState;
+    let reply, newState, file;
     let tries = 0;
     const MAX_TRANSITIONS = 5; // Para evitar bucles infinitos
 
@@ -27,7 +27,11 @@ module.exports = async (sock, m) => {
       let state = userState.getState(from);
 
       // 2. Pasar el mensaje al router, usando el estado más reciente
-      ({ reply, newState,file } = await flowRouter.route(from, inputText, state));
+      ({ reply, newState, file } = await flowRouter.route(
+        from,
+        inputText,
+        state
+      ));
 
       // 3. Guardar el nuevo estado (haciendo merge si tu setState lo soporta)
       userState.setState(from, newState);
@@ -40,6 +44,9 @@ module.exports = async (sock, m) => {
     // 5. Enviar la respuesta si existe
     if (reply) {
       await sock.sendMessage(from, { text: reply });
+    }
+    if (file) {
+      await sock.sendMessage(from, file);
     }
   } catch (error) {
     console.error("Error procesando mensaje:", error);

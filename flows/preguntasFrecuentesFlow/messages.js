@@ -1,6 +1,6 @@
-async function mostrarPreguntasFrecuentes(usuario) {
-  // Preguntas frecuentes con emojis
-  const mensajeFAQ = `📚 *Preguntas Frecuentes*
+ const mostrarPreguntasFrecuentes = () =>
+
+ `📚 *Preguntas Frecuentes*
 
 🕐 _¿Cuál es el horario de atención?_  
 Nuestro horario de atención es de lunes a viernes, de 8:00 AM a 3:00 PM.
@@ -19,7 +19,6 @@ No, no es posible completar el trámite de préstamo por esta vía.
 💰 _¿Cuál es el monto máximo del préstamo?_  
 El importe varía según la situación de cada derechohabiente (antigüedad, capacidad de pago). Para conocer tu caso específico, te recomendamos consultar con un asesor.
 `;
-
   const mensajeMenu = `⬅️ Puedes escribir \`menú\` para regresar al inicio y ver las opciones disponibles.`;
-}
+
 module.exports = { mostrarPreguntasFrecuentes };

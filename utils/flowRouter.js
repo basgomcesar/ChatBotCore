@@ -48,10 +48,11 @@ module.exports = {
         },
       };
     }
-    const { reply, newState } = await flowHandler.handle(userId, text, state);
+    const { reply, newState,file } = await flowHandler.handle(userId, text, state);
 
     return {
       reply,
+      file,
       newState: newState || state,
     };
   },
