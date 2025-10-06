@@ -1,7 +1,7 @@
 const { FLOWS, GLOBAL_COMMANDS } = require("../config/constants");
 const requisitosFlow = require("../flows/requisitosFlow/requisitosFlow");
 const welcomeFlow = require("../flows/bienvenidaFlow/welcomeFlow");
-// const soporteFlow = require("../flows/soporteFlow");
+const asesorFlow = require("../flows/asesorFlow/asesorFlow");
 const userState = require("../state/userState");
 const preguntasFrecuentesFlow = require("../flows/preguntasFrecuentesFlow/preguntasFrecuentesFlow");
 
@@ -9,7 +9,8 @@ const preguntasFrecuentesFlow = require("../flows/preguntasFrecuentesFlow/pregun
 const FLOW_HANDLERS = {
   [FLOWS.BIENVENIDA.NAME]: welcomeFlow,
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
-  [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow
+  [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow,
+  [FLOWS.ASESOR.NAME]:asesorFlow
   // Agrega más flujos aquí
 };
 

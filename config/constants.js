@@ -29,6 +29,7 @@ const FLOWS = {
     NAME: "ASESOR",
     STEPS: {
       ASESOR_INICIAL: "ASESOR_INICIAL",
+      CHAT_SUSPENDIDO: "CHAT_SUSPENDIDO",
     },
   },
   SIMULACION: {
