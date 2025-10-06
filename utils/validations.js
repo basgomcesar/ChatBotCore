@@ -11,6 +11,28 @@ function isValidMenuOption(input, min, max) {
   return !isNaN(num) && num >= min && num <= max;
 }
 
+function esHorarioDeAtencion() {
+  // Obtener fecha/hora actual en zona horaria de la Ciudad de México
+  const cdmxTime = new Date().toLocaleString("en-US", {
+    timeZone: "America/Mexico_City",
+  });
+  const nowCDMX = new Date(cdmxTime);
+
+  // Obtener día de la semana (0 = domingo, 1 = lunes, ..., 6 = sábado)
+  const dayOfWeek = nowCDMX.getDay();
+
+  // Obtener la hora del día (formato 0-23)
+  const hour = nowCDMX.getHours();
+
+  // Verificar que sea lunes a viernes (dayOfWeek: 1..5)
+  const esDiaHabil = dayOfWeek >= 1 && dayOfWeek <= 5;
+
+  // Verificar que la hora esté entre 8:00 y 14:59
+  const esHoraValida = hour >= 8 && hour < 15;
+
+  return esDiaHabil && esHoraValida;
+}
+
 // Valida si una cadena contiene solo números (ejemplo: para CURP, teléfono, etc.)
 function isNumeric(str) {
   return /^\d+$/.test(str.trim());
@@ -20,7 +42,6 @@ function detectUserType(input) {
   const normalized = (input || "").toLowerCase().trim();
   const tokens = normalized.split(/\W+/).filter(Boolean);
   const isNumber = /^\d+$/.test(normalized);
-  
 
   // Palabras clave por tipo
   const activeKeywords = ["activo", "activa"];
@@ -48,5 +69,6 @@ module.exports = {
   isValidName,
   isValidMenuOption,
   isNumeric,
-  detectUserType
+  detectUserType,
+  esHorarioDeAtencion
 };

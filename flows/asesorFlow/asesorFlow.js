@@ -1,20 +1,35 @@
 const { FLOWS } = require("../../config/constants");
-//const {  } = require("./messages");
+const { mensajeAsesor } = require("./messages");
+const { esHorarioDeAtencion } = require("../../utils/validations");
 
 // Centraliza los nombres de flujo
 const FLOW_NAME = FLOWS.ASESOR.NAME;
 const STEPS = FLOWS.ASESOR.STEPS;
 
 
-
-
 const stepHandlers = {
-  [STEPS.ASESOR_INICIAL]: async (userId, text, state) => ({
-    //reply: mostrarPreguntasFrecuentes(),
-    newState: { flow: FLOWS.BIENVENIDA.NAME, step: FLOWS.BIENVENIDA.STEPS.MENU },
-  }),
-};
+  [STEPS.ASESOR_INICIAL]: async (userId, text, state) => {
+    if (!esHorarioDeAtencion()) {
+      return {
+        reply: mensajeAsesor(state.name),
+        newState: {
+          flow: FLOWS.BIENVENIDA.NAME,
+          step: FLOWS.BIENVENIDA.STEPS.MENU,
+        },
+      };
+    }else{
+      return {
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.CHAT_SUSPENDIDO,
+        },
+      };
+    }
+  },
+  [STEPS.CHAT_SUSPENDIDO]: async (userId, text, state) => {
 
+  }
+};
 
 module.exports = {
   /**
