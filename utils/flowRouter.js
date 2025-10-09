@@ -4,13 +4,15 @@ const welcomeFlow = require("../flows/bienvenidaFlow/welcomeFlow");
 const asesorFlow = require("../flows/asesorFlow/asesorFlow");
 const userState = require("../state/userState");
 const preguntasFrecuentesFlow = require("../flows/preguntasFrecuentesFlow/preguntasFrecuentesFlow");
+const simulacionFlow = require("../flows/simulacionFlow/simulacionFlow");
 
 // Mapea los nombres de flujo a su handler
 const FLOW_HANDLERS = {
   [FLOWS.BIENVENIDA.NAME]: welcomeFlow,
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
   [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow,
-  [FLOWS.ASESOR.NAME]:asesorFlow
+  [FLOWS.ASESOR.NAME]:asesorFlow,
+  [FLOWS.SIMULACION.NAME]:simulacionFlow
   // Agrega más flujos aquí
 };
 
