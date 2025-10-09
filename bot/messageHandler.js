@@ -12,7 +12,7 @@ module.exports = async (sock, m) => {
       msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
     if (!text || from.endsWith("@g.us")) return;
-    if (!from.endsWith("2556@s.whatsapp.net")) return;
+
 
     console.log(`📩 Mensaje de ${from}: ${text}`);
 
