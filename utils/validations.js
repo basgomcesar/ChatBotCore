@@ -1,16 +1,37 @@
+/**
+ * Validation utilities for user input
+ * @module validations
+ */
+
 const { USUARIOS } = require("../config/constants");
 
-// Valida si un nombre es válido (solo letras y espacios, mínimo 2 caracteres)
+/**
+ * Validates if a name is valid (only letters and spaces, minimum 2 characters)
+ * @param {string} name - The name to validate
+ * @returns {boolean} True if the name is valid, false otherwise
+ */
 function isValidName(name) {
+  if (!name || typeof name !== 'string') return false;
   return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,}$/.test(name.trim());
 }
 
-// Valida si la opción es un número dentro de un rango permitido
+/**
+ * Validates if the option is a number within a permitted range
+ * @param {string|number} input - The input to validate
+ * @param {number} min - Minimum value
+ * @param {number} max - Maximum value
+ * @returns {boolean} True if the option is valid, false otherwise
+ */
 function isValidMenuOption(input, min, max) {
   const num = parseInt(input, 10);
   return !isNaN(num) && num >= min && num <= max;
 }
 
+/**
+ * Checks if the current time is within business hours
+ * Business hours: Monday to Friday, 8:00 AM to 3:00 PM (Mexico City time)
+ * @returns {boolean} True if within business hours, false otherwise
+ */
 function esHorarioDeAtencion() {
   // Obtener fecha/hora actual en zona horaria de la Ciudad de México
   const cdmxTime = new Date().toLocaleString("en-US", {
@@ -33,11 +54,22 @@ function esHorarioDeAtencion() {
   return esDiaHabil && esHoraValida;
 }
 
-// Valida si una cadena contiene solo números (ejemplo: para CURP, teléfono, etc.)
+/**
+ * Validates if a string contains only numbers
+ * @param {string} str - The string to validate
+ * @returns {boolean} True if the string is numeric, false otherwise
+ */
 function isNumeric(str) {
+  if (!str || typeof str !== 'string') return false;
   return /^\d+$/.test(str.trim());
 }
 
+/**
+ * Detects the user type based on input
+ * Recognizes numeric options (1 for active, 2 for retired) and keywords
+ * @param {string} input - The user input
+ * @returns {string|null} The user type (ACTIVO or PENSIONADO) or null if not detected
+ */
 function detectUserType(input) {
   const normalized = (input || "").toLowerCase().trim();
   const tokens = normalized.split(/\W+/).filter(Boolean);
