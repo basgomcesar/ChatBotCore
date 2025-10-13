@@ -1,3 +1,10 @@
+/**
+ * Welcome flow handler
+ * Manages the initial conversation flow including greeting, name collection,
+ * user type identification, and main menu navigation
+ * @module welcomeFlow
+ */
+
 const { FLOWS, USUARIOS } = require("../../config/constants");
 const {
   BIENVENIDA,
@@ -7,10 +14,14 @@ const {
 } = require("./messages");
 const { detectUserType, isValidName } = require("../../utils/validations");
 
-// Centraliza los nombres de flujo
+// Centralize flow constants
 const FLOW_NAME = FLOWS.BIENVENIDA.NAME;
 const STEPS = FLOWS.BIENVENIDA.STEPS;
 
+/**
+ * Menu routing configuration
+ * Maps menu option numbers to their corresponding flow and step
+ */
 const menuRoutes = {
   1: {
     flow: FLOWS.REQUISITOS.NAME,
@@ -28,7 +39,10 @@ const menuRoutes = {
     flow: FLOWS.COMPROBANTE.NAME,
     step: FLOWS.COMPROBANTE.STEPS.COMPROBANTE_INICIAL,
   },
-  5: { flow: FLOWS.ASESOR.NAME, step: FLOWS.ASESOR.STEPS.ASESOR_INICIAL },
+  5: { 
+    flow: FLOWS.ASESOR.NAME, 
+    step: FLOWS.ASESOR.STEPS.ASESOR_INICIAL 
+  },
   6: {
     flow: FLOWS.PREGUNTAS_FRECUENTES.NAME,
     step: FLOWS.PREGUNTAS_FRECUENTES.STEPS.PREGUNTAS_FRECUENTES_INICIAL,
@@ -47,7 +61,7 @@ const stepHandlers = {
         reply: PREGUNTAR_TIPO_USUARIO(nombre),
         newState: {
           flow: FLOW_NAME,
-          step: STEPS.ESPREANDO_TIPO_USUARIO,
+          step: STEPS.ESPERANDO_TIPO_USUARIO,
           name: nombre,
         },
       };
@@ -57,7 +71,7 @@ const stepHandlers = {
       newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_NOMBRE },
     };
   },
-  [STEPS.ESPREANDO_TIPO_USUARIO]: async (userId, text, state) => {
+  [STEPS.ESPERANDO_TIPO_USUARIO]: async (userId, text, state) => {
     const usuario = detectUserType(text);
     if (usuario) {
       return {
@@ -66,7 +80,7 @@ const stepHandlers = {
     }
     return {
       reply: ERRORES.TIPO_USUARIO_INVALIDO(state.name),
-      newState: { flow: FLOW_NAME, step: STEPS.ESPREANDO_TIPO_USUARIO },
+      newState: { flow: FLOW_NAME, step: STEPS.ESPERANDO_TIPO_USUARIO },
     };
   },
   [STEPS.MENU]: async (userId, text, state) => {
@@ -85,7 +99,11 @@ const stepHandlers = {
 
 module.exports = {
   /**
-   * Maneja los pasos del flujo de bienvenida
+   * Handles the welcome flow steps
+   * @param {string} userId - User ID
+   * @param {string} text - User input text
+   * @param {object} state - Current user state
+   * @returns {Promise<object>} Object containing reply and newState
    */
   handle: async (userId, text, state) => {
     const handler = stepHandlers[state.step];

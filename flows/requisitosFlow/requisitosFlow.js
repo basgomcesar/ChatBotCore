@@ -1,6 +1,14 @@
+/**
+ * Requirements flow handler
+ * Manages the flow for providing loan requirement documents
+ * based on user type (active or retired) and loan type
+ * @module requisitosFlow
+ */
+
 const { FLOWS, USUARIOS } = require("../../config/constants");
 const fs = require("fs");
 const path = require("path");
+const logger = require("../../config/logger");
 
 const {
   PREGUNTAR_TIPO_PRESTAMO,
@@ -13,7 +21,10 @@ const {
 const FLOW = FLOWS.REQUISITOS.NAME;
 const STEPS = FLOWS.REQUISITOS.STEPS;
 
-// --- Configuración centralizada de archivos y mensajes ---
+/**
+ * Centralized configuration for requirement files and messages
+ * Organized by user type and loan type
+ */
 const requisitosConfig = {
   [USUARIOS.ACTIVO]: {
     "1": {
@@ -41,7 +52,11 @@ const requisitosConfig = {
   },
 };
 
-// --- Función auxiliar para construir la respuesta ---
+/**
+ * Builds a response with the appropriate requirement document
+ * @param {object} config - Configuration object with fileName, reply, and caption
+ * @returns {object} Response object with reply, file, and newState
+ */
 function buildResponse(config) {
   try {
     const pdfPath = path.join(__dirname, "..", "..", "archivos", config.fileName);
@@ -61,7 +76,7 @@ function buildResponse(config) {
       },
     };
   } catch (err) {
-    console.error(`⚠️ Error al leer el archivo ${config.fileName}:`, err.message);
+    logger.error(`Error al leer el archivo ${config.fileName}:`, err);
     return {
       reply: "❌ No se encontró el archivo de requisitos. Contacta con soporte.",
       newState: {
@@ -103,6 +118,13 @@ const stepHandlers = {
 };
 
 module.exports = {
+  /**
+   * Handles the requirements flow steps
+   * @param {string} userId - User ID
+   * @param {string} text - User input text
+   * @param {object} state - Current user state
+   * @returns {Promise<object>} Object containing reply, file, and newState
+   */
   handle: async (userId, text, state) => {
     const handler = stepHandlers[state.step];
     if (handler) return handler(userId, text, state);

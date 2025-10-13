@@ -1,12 +1,15 @@
+/**
+ * Frequently Asked Questions (FAQ) flow handler
+ * Displays common questions and answers to users
+ * @module preguntasFrecuentesFlow
+ */
+
 const { FLOWS } = require("../../config/constants");
 const { mostrarPreguntasFrecuentes } = require("./messages");
 
-// Centraliza los nombres de flujo
+// Centralize flow constants
 const FLOW_NAME = FLOWS.PREGUNTAS_FRECUENTES.NAME;
 const STEPS = FLOWS.PREGUNTAS_FRECUENTES.STEPS;
-
-
-
 
 const stepHandlers = {
   [STEPS.PREGUNTAS_FRECUENTES_INICIAL]: async (userId, text, state) => ({
@@ -17,7 +20,11 @@ const stepHandlers = {
 
 module.exports = {
   /**
-   * Maneja los pasos del flujo de preguntas frecuentes
+   * Handles the FAQ flow steps
+   * @param {string} userId - User ID
+   * @param {string} text - User input text
+   * @param {object} state - Current user state
+   * @returns {Promise<object>} Object containing reply and newState
    */
   handle: async (userId, text, state) => {
     const handler = stepHandlers[state.step];
@@ -26,7 +33,10 @@ module.exports = {
     }
     return {
       reply: "❌ Paso no reconocido en el flujo de Preguntas frecuentes.",
-      newState: { flow: FLOW_NAME, step: STEPS.SALUDO_INICIAL },
+      newState: { 
+        flow: FLOWS.BIENVENIDA.NAME, 
+        step: FLOWS.BIENVENIDA.STEPS.MENU 
+      },
     };
   },
 };

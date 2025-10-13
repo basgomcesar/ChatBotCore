@@ -1,3 +1,8 @@
+/**
+ * Flow router - Routes messages to the appropriate conversation flow
+ * @module flowRouter
+ */
+
 const { FLOWS, GLOBAL_COMMANDS } = require("../config/constants");
 const requisitosFlow = require("../flows/requisitosFlow/requisitosFlow");
 const welcomeFlow = require("../flows/bienvenidaFlow/welcomeFlow");
@@ -5,30 +10,34 @@ const asesorFlow = require("../flows/asesorFlow/asesorFlow");
 const userState = require("../state/userState");
 const preguntasFrecuentesFlow = require("../flows/preguntasFrecuentesFlow/preguntasFrecuentesFlow");
 const simulacionFlow = require("../flows/simulacionFlow/simulacionFlow");
+const logger = require("../config/logger");
 
-// Mapea los nombres de flujo a su handler
+/**
+ * Maps flow names to their respective handlers
+ */
 const FLOW_HANDLERS = {
   [FLOWS.BIENVENIDA.NAME]: welcomeFlow,
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
   [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow,
-  [FLOWS.ASESOR.NAME]:asesorFlow,
-  [FLOWS.SIMULACION.NAME]:simulacionFlow
-  // Agrega más flujos aquí
+  [FLOWS.ASESOR.NAME]: asesorFlow,
+  [FLOWS.SIMULACION.NAME]: simulacionFlow
+  // Add more flows here as needed
 };
 
 module.exports = {
   /**
-   * Ruta el mensaje al flujo correcto según el estado del usuario
-   * @param {string} userId - ID de usuario
-   * @param {string} text - Texto recibido
-   * @param {object} state - Estado actual del usuario
-   * @returns {object} - { reply, newState }
+   * Routes a message to the correct flow based on user state
+   * @param {string} userId - User ID (phone number)
+   * @param {string} text - Received message text
+   * @param {object} state - Current user state
+   * @returns {Promise<object>} Object containing reply, newState, and optionally file
    */
   route: async (userId, text, state) => {
     const cleanText = text.trim().toLowerCase();
 
-    // 1. Comando global
+    // 1. Check for global commands (menu, inicio, cancelar)
     if (GLOBAL_COMMANDS.includes(cleanText)) {
+      logger.info(`Usuario ${userId} ejecutó comando global: ${cleanText}`);
       userState.resetState(userId);
       return {
         reply: "🔙 Has regresado al menú principal",
@@ -39,10 +48,12 @@ module.exports = {
       };
     }
 
-    // 2. Handler por flujo (usando objeto en vez de switch)
+    // 2. Route to appropriate flow handler
     const flowHandler =
       FLOW_HANDLERS[state.flow] || FLOW_HANDLERS[FLOWS.BIENVENIDA.NAME];
+    
     if (!flowHandler) {
+      logger.error(`No se encontró handler para el flujo: ${state.flow}`);
       return {
         reply: "❌ Ocurrió un error interno. Intenta más tarde.",
         newState: {
@@ -51,7 +62,8 @@ module.exports = {
         },
       };
     }
-    const { reply, newState,file } = await flowHandler.handle(userId, text, state);
+    
+    const { reply, newState, file } = await flowHandler.handle(userId, text, state);
 
     return {
       reply,
