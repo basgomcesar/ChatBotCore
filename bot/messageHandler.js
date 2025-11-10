@@ -33,8 +33,8 @@ module.exports = async (sock, m) => {
 
     do {
       // 1. Siempre obtiene el estado actual según el número antes de cada transición
-      let state = userState.getState(from);
-
+      let state = await userState.getState(from);
+      
       // 2. Pasar el mensaje al router, usando el estado más reciente
       ({ reply, newState, file } = await flowRouter.route(
         from,
@@ -43,7 +43,7 @@ module.exports = async (sock, m) => {
       ));
 
       // 3. Guardar el nuevo estado (haciendo merge si tu setState lo soporta)
-      userState.setState(from, newState);
+      await userState.setState(from, newState);
 
       // 4. Para siguientes ciclos, inputText es vacío
       inputText = "";
