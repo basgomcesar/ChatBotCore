@@ -1,7 +1,17 @@
+/**
+ * Message handler for processing incoming WhatsApp messages
+ * @module messageHandler
+ */
+
 const userState = require("../state/userState");
 const flowRouter = require("../utils/flowRouter");
+const logger = require("../config/logger");
 
-// Lógica para procesar mensajes (llama a los flows)
+/**
+ * Processes incoming messages and routes them to appropriate flows
+ * @param {object} sock - WhatsApp socket connection
+ * @param {object} m - Message event object
+ */
 module.exports = async (sock, m) => {
   try {
     const msg = m.messages?.[0];
@@ -13,8 +23,7 @@ module.exports = async (sock, m) => {
 
     if (!text || from.endsWith("@g.us")) return;
 
-
-    console.log(`📩 Mensaje de ${from}: ${text}`);
+    logger.info(`📩 Mensaje de ${from}: ${text}`);
 
     let reply, newState, file;
     let tries = 0;
@@ -24,8 +33,8 @@ module.exports = async (sock, m) => {
 
     do {
       // 1. Siempre obtiene el estado actual según el número antes de cada transición
-      let state = userState.getState(from);
-
+      let state = await userState.getState(from);
+      
       // 2. Pasar el mensaje al router, usando el estado más reciente
       ({ reply, newState, file } = await flowRouter.route(
         from,
@@ -34,7 +43,7 @@ module.exports = async (sock, m) => {
       ));
 
       // 3. Guardar el nuevo estado (haciendo merge si tu setState lo soporta)
-      userState.setState(from, newState);
+      await userState.setState(from, newState);
 
       // 4. Para siguientes ciclos, inputText es vacío
       inputText = "";
@@ -49,6 +58,14 @@ module.exports = async (sock, m) => {
       await sock.sendMessage(from, file);
     }
   } catch (error) {
-    console.error("Error procesando mensaje:", error);
+    logger.error("Error procesando mensaje:", error);
+    // Attempt to send error message to user
+    try {
+      await sock.sendMessage(from, { 
+        text: "❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta nuevamente o escribe 'menu' para regresar al inicio." 
+      });
+    } catch (sendError) {
+      logger.error("Error enviando mensaje de error al usuario:", sendError);
+    }
   }
 };

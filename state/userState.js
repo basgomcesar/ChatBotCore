@@ -1,50 +1,94 @@
-const fs = require("fs");
-const path = require("path");
-const { FLOWS } = require("../config/constants"); 
+/**
+ * User state management module
+ * Manages conversation state for each user, persisted in backend (.NET API)
+ * @module userState
+ */
 
-const stateFile = path.join(__dirname, "userState.json");
+const { FLOWS } = require("../config/constants");
+const logger = require("../config/logger");
+const { getUserState, setUserState } = require("../services/apiService");
 
-// Cargar estado inicial desde el JSON (si existe)
-let userStates = {};
-if (fs.existsSync(stateFile)) {
+/**
+ * Gets the current state for a user from backend
+ * @param {string} userId - User ID (phone number)
+ * @returns {Promise<object>} User state object with flow and step information
+ */
+async function getState(userId) {
   try {
-    userStates = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-  } catch (err) {
-    console.error("❌ Error leyendo userState.json:", err);
-  }
-}
+    const response = await getUserState(userId);
 
-// Guardar el estado en el archivo
-function saveStates() {
-  try {
-    fs.writeFileSync(stateFile, JSON.stringify(userStates, null, 2), "utf8");
-  } catch (err) {
-    console.error("❌ Error guardando userState.json:", err);
-  }
-}
+    if (response && response.flujo && response.paso) {
+      return {
+        flow: response.flujo,
+        step: response.paso,
+        folio: response.folio || null,
+        userType: response.tipo || 0,
+        name: response.nombre || "",
+      };
+    }
 
-module.exports = {
-  getState: (userId) => {
-    return (
-      userStates[userId] || {
-        flow: FLOWS.BIENVENIDA.NAME,
-        step: FLOWS.BIENVENIDA.STEPS.SALUDO_INICIAL,
-      }
-    );
-  },
-
-  setState: (userId, newState) => {
-    userStates[userId] = { ...userStates[userId], ...newState };
-    saveStates();
-  },
-
-  resetState: (userId) => {
-    userStates[userId] = {
+    // Default state for new users
+    return {
       flow: FLOWS.BIENVENIDA.NAME,
       step: FLOWS.BIENVENIDA.STEPS.SALUDO_INICIAL,
     };
-    saveStates();
-  },
+  } catch (error) {
+    logger.error(`❌ Error obteniendo estado del usuario ${userId}:`, error.message);
+    return {
+      flow: FLOWS.BIENVENIDA.NAME,
+      step: FLOWS.BIENVENIDA.STEPS.SALUDO_INICIAL,
+    };
+  }
+}
 
-  getAllStates: () => userStates,
+/**
+ * Saves or updates the state for a user in backend
+ * @param {string} userId - User ID (phone number)
+ * @param {object} newState - New state object to merge with existing state
+ */
+async function setState(userId, newState) {
+  try {
+    const payload = {
+      nombre:newState.name,
+      telefono: userId,
+      flujo: newState.flow,
+      paso: newState.step,
+      folio: newState.folio ,
+      tipo: newState.userType ,
+    };
+
+    await setUserState(payload);
+    logger.info(`✅ Estado actualizado en backend para usuario ${userId}`);
+  } catch (error) {
+    logger.error(`❌ Error actualizando estado del usuario ${userId}:`, error.message);
+  }
+}
+
+/**
+ * Resets a user's state to the initial welcome state
+ * @param {string} userId - User ID (phone number)
+ */
+async function resetState(userId) {
+  const defaultState = {
+    flow: FLOWS.BIENVENIDA.NAME,
+    step: FLOWS.BIENVENIDA.STEPS.SALUDO_INICIAL,
+  };
+  await setState(userId, defaultState);
+  return defaultState;
+}
+
+/**
+ * Gets all user states (not applicable when using backend)
+ * Included for compatibility/debug purposes
+ */
+function getAllStates() {
+  logger.warn("⚠️ getAllStates() no está disponible en modo backend");
+  return {};
+}
+
+module.exports = {
+  getState,
+  setState,
+  resetState,
+  getAllStates,
 };

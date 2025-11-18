@@ -1,3 +1,12 @@
+/**
+ * Configuration constants for the chatbot
+ * @module constants
+ */
+
+/**
+ * Flow definitions for the chatbot conversation flows
+ * Each flow represents a distinct conversation path with multiple steps
+ */
 const FLOWS = {
   BIENVENIDA: {
     NAME: "BIENVENIDA",
@@ -7,7 +16,7 @@ const FLOWS = {
       MENU: "MENU",
       ESPERANDO_OPCION: "ESPERANDO_OPCION",
       PREGUNTAR_TIPO_USUARIO: "PREGUNTAR_TIPO_USUARIO",
-      ESPREANDO_TIPO_USUARIO: "ESPREANDO_TIPO_USUARIO",
+      ESPERANDO_TIPO_USUARIO: "ESPERANDO_TIPO_USUARIO",
     },
   },
   REQUISITOS: {
@@ -50,13 +59,21 @@ const FLOWS = {
       LLENADO_SOLICITUD_INICIAL: "LLENADO_SOLICITUD_INICIAL",
     },
   },
-  // AGREGAR MAS FLUJOS/PASOS
+  // Add more flows and steps as needed
 };
 
+/**
+ * User types for the chatbot
+ */
 const USUARIOS = {
   PENSIONADO: "PENSIONADO",
   ACTIVO: "ACTIVO",
 };
+
+/**
+ * Global commands that can be used at any point in the conversation
+ * to return to the main menu
+ */
 const GLOBAL_COMMANDS = ["menu", "inicio", "cancelar"];
 
 module.exports = {
