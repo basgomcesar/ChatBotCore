@@ -45,7 +45,7 @@ async function setUserState({
       paso,
       folio: folio ?? "",
       tipo: String(tipo ?? ""),
-      nombre,
+      nombre: nombre ?? "",
     };
     const response = await api.post(`/Derechohabiente/update-state`, payload);
     return response.data;
@@ -54,7 +54,8 @@ async function setUserState({
       console.error(
         "❌ Error del backend:",
         error.response.status,
-        error.response.data
+        error.response.data,
+        error
       );
     } else if (error.request) {
       console.error("❌ No hubo respuesta del servidor:", error.request);
