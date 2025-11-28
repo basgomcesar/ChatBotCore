@@ -22,36 +22,35 @@ module.exports = async (sock, m) => {
       msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
     if (!text || from.endsWith("@g.us")) return;
-
     logger.info(`📩 Mensaje de ${from}: ${text}`);
 
     let reply, newState, file;
     let tries = 0;
-    const MAX_TRANSITIONS = 5; // Para evitar bucles infinitos
+    const MAX_TRANSITIONS = 5;
 
     let inputText = text;
 
     do {
-      // 1. Siempre obtiene el estado actual según el número antes de cada transición
       let state = await userState.getState(from);
       
-      // 2. Pasar el mensaje al router, usando el estado más reciente
       ({ reply, newState, file } = await flowRouter.route(
         from,
         inputText,
         state
       ));
 
-      // 3. Guardar el nuevo estado (haciendo merge si tu setState lo soporta)
       await userState.setState(from, newState);
 
-      // 4. Para siguientes ciclos, inputText es vacío
       inputText = "";
       tries++;
     } while (!reply && tries < MAX_TRANSITIONS);
 
-    // 5. Enviar la respuesta si existe
-    if (reply) {
+    // 5. Enviar mas de una respuesta si hay un array en lugar de un string
+    if (Array.isArray(reply)) {
+      for (const message of reply) {
+        await sock.sendMessage(from, { text: message });
+      }
+    } else if (reply) {
       await sock.sendMessage(from, { text: reply });
     }
     if (file) {

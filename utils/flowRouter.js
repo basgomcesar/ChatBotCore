@@ -10,6 +10,7 @@ const asesorFlow = require("../flows/asesorFlow/asesorFlow");
 const userState = require("../state/userState");
 const preguntasFrecuentesFlow = require("../flows/preguntasFrecuentesFlow/preguntasFrecuentesFlow");
 const simulacionFlow = require("../flows/simulacionFlow/simulacionFlow");
+const llenadoSolicitudFlow = require("../flows/llenadoSolicitudFlow/llenadoSolicitudFlow");
 const logger = require("../config/logger");
 
 /**
@@ -20,7 +21,9 @@ const FLOW_HANDLERS = {
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
   [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow,
   [FLOWS.ASESOR.NAME]: asesorFlow,
-  [FLOWS.SIMULACION.NAME]: simulacionFlow
+  [FLOWS.SIMULACION.NAME]: simulacionFlow,
+  [FLOWS.LLENADO_SOLICITUD.NAME]: llenadoSolicitudFlow,
+
   // Add more flows here as needed
 };
 
