@@ -1,5 +1,5 @@
 const { FLOWS, USUARIOS } = require("../../config/constants");
-const { REQ_SIMULACION_ACTIVO, MSG_PREPARADO } = require("./messages");
+const { REQ_SIMULACION_ACTIVO, MSG_PREPARADO,REQ_SIMULACION_PENSIONADO } = require("./messages");
 
 // Centraliza los nombres de flujo
 const FLOW_NAME = FLOWS.SIMULACION.NAME;
@@ -16,7 +16,7 @@ const stepHandlers = {
       }
     } else if (state.userType == USUARIOS.PENSIONADO) {
       return {
-        reply: "Eres un usuario pensionado para prestamo",
+        reply: [REQ_SIMULACION_PENSIONADO(), MSG_PREPARADO()],
         newState: {
           flow: FLOWS.BIENVENIDA.NAME, step: FLOWS.BIENVENIDA.STEPS.MENU
         }
