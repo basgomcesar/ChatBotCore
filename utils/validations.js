@@ -50,7 +50,6 @@ function esHorarioDeAtencion() {
 
   // Verificar que la hora esté entre 8:00 y 14:59
   const esHoraValida = hour >= 8 && hour < 15;
-
   return esDiaHabil && esHoraValida;
 }
 

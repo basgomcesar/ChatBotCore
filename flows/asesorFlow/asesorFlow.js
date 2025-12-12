@@ -37,7 +37,12 @@ const stepHandlers = {
   [STEPS.CHAT_SUSPENDIDO]: async (userId, text, state) => {
     // Chat is suspended - human advisor should be handling the conversation
     // No automatic response
-    return {};
+    return {
+      newState: {
+        flow: FLOW_NAME,
+        step: STEPS.CHAT_SUSPENDIDO,
+      },
+    };
   }
 };
 
@@ -56,9 +61,9 @@ module.exports = {
     }
     return {
       reply: "❌ Paso no reconocido en el flujo de asesor.",
-      newState: { 
-        flow: FLOWS.BIENVENIDA.NAME, 
-        step: FLOWS.BIENVENIDA.STEPS.MENU 
+      newState: {
+        flow: FLOWS.BIENVENIDA.NAME,
+        step: FLOWS.BIENVENIDA.STEPS.MENU
       },
     };
   },
