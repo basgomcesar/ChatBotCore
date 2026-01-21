@@ -39,7 +39,7 @@ module.exports = async (sock, m) => {
       return;
     }
 
-    if (! text) return;
+    if (!text) return;
     
     logger.info(`📩 Mensaje de ${from}: ${text}`);
 
@@ -72,7 +72,7 @@ module.exports = async (sock, m) => {
 
       inputText = "";
       tries++;
-    } while (! reply && tries < MAX_TRANSITIONS);
+    } while (!reply && tries < MAX_TRANSITIONS);
 
     // Enviar respuestas
     if (Array.isArray(reply)) {
@@ -92,7 +92,7 @@ module.exports = async (sock, m) => {
     
     // Intentar enviar mensaje de error al usuario
     try {
-      const from = msg?. key?.remoteJid;
+      const from = msg?.key?.remoteJid;
       if (from) {
         await sock.sendMessage(from, { 
           text: "❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta nuevamente o escribe 'menu' para regresar al inicio." 

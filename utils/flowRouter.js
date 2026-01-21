@@ -14,10 +14,10 @@ const llenadoSolicitudFlow = require("../flows/llenadoSolicitudFlow/llenadoSolic
 const logger = require("../config/logger");
 
 const FLOW_HANDLERS = {
-  [FLOWS. BIENVENIDA. NAME]: welcomeFlow,
+  [FLOWS.BIENVENIDA.NAME]: welcomeFlow,
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
-  [FLOWS. PREGUNTAS_FRECUENTES. NAME]: preguntasFrecuentesFlow,
-  [FLOWS.ASESOR.NAME]:  asesorFlow,
+  [FLOWS.PREGUNTAS_FRECUENTES.NAME]: preguntasFrecuentesFlow,
+  [FLOWS.ASESOR.NAME]: asesorFlow,
   [FLOWS.SIMULACION.NAME]: simulacionFlow,
   [FLOWS.LLENADO_SOLICITUD.NAME]: llenadoSolicitudFlow,
 };
@@ -40,7 +40,7 @@ module.exports = {
       userState.resetState(userId);
       return {
         reply: "🔙 Has regresado al menú principal",
-        newState:  {
+        newState: {
           flow: FLOWS.BIENVENIDA.NAME,
           step: FLOWS.BIENVENIDA.STEPS.MENU,
         },
@@ -51,13 +51,13 @@ module.exports = {
     const flowHandler =
       FLOW_HANDLERS[state.flow] || FLOW_HANDLERS[FLOWS.BIENVENIDA.NAME];
     
-    if (! flowHandler) {
-      logger.error(`No se encontró handler para el flujo: ${state. flow}`);
+    if (!flowHandler) {
+      logger.error(`No se encontró handler para el flujo: ${state.flow}`);
       return {
-        reply: "❌ Ocurrió un error interno.  Intenta más tarde.",
+        reply: "❌ Ocurrió un error interno. Intenta más tarde.",
         newState: {
-          flow: FLOWS. BIENVENIDA.NAME,
-          step: FLOWS.BIENVENIDA.STEPS. MENU,
+          flow: FLOWS.BIENVENIDA.NAME,
+          step: FLOWS.BIENVENIDA.STEPS.MENU,
         },
       };
     }
@@ -73,7 +73,7 @@ module.exports = {
     return {
       reply,
       file,
-      newState:  newState || state,
+      newState: newState || state,
     };
   },
 };

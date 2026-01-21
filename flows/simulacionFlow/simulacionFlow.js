@@ -9,14 +9,14 @@ const STEPS = FLOWS.SIMULACION.STEPS;
 
 const stepHandlers = {
   [STEPS.SIMULACION_INICIAL]: async (userId, text, state) => {
-    if (state.userType == USUARIOS.ACTIVO) {
+    if (state.userType === USUARIOS.ACTIVO) {
       return {
         reply: [REQ_SIMULACION_ACTIVO(), MSG_PREPARADO()],
         newState: {
           flow: FLOW_NAME, step: STEPS.SIMULACION_CREDENCIAL
         }
       }
-    } else if (state.userType == USUARIOS.PENSIONADO) {
+    } else if (state.userType === USUARIOS.PENSIONADO) {
       return {
         reply: [REQ_SIMULACION_PENSIONADO(), MSG_PREPARADO()],
         newState: {
@@ -47,8 +47,8 @@ const stepHandlers = {
   [STEPS.VALIDACION_CREDENCIAL]: async (userId, text, state, messageData) => {
     // Aquí se manejaría la validación de la credencial enviada por el usuario
     const { imageBuffer, messageType } = messageData || {};
-    console.log("imageBuffer:", imageBuffer);
-    console.log("messageType:", messageType);
+    logger.debug(`imageBuffer: ${imageBuffer ? `${imageBuffer.length} bytes` : 'null'}`);
+    logger.debug(`messageType: ${messageType}`);
     if (!imageBuffer || messageType !== "image") {
       return {
         reply: "❌ Por favor, envía una foto de tu credencial del IPE.\n\n" +

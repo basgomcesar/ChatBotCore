@@ -1,8 +1,14 @@
+/**
+ * Image processing service for credential validation
+ * @module imageProcessingService
+ */
+
 const axios = require("axios");
 const FormData = require("form-data");
 const logger = require("../config/logger");
 const sharp = require("sharp");
 
+// Environment configuration
 const IMAGE_PROCESSING_API_URL =
   process.env.IMAGE_PROCESSING_API_URL ||
   "http://localhost:5003/api/Credencial/upload";
@@ -10,15 +16,35 @@ const BACKEND_API_USER_INFO_URL = process.env.BACKEND_API_USER_INFO_URL ||
   "http://ipeenlinea.ipever.gob.mx/WSIPEEnLinea/api/v2/prestamos/login";
 const BACKEND_SIMULACION_API_URL = process.env.BACKEND_SIMULACION_API_URL ||
   "http://localhost:5003/api";
+
+// Image processing constants
+const MAX_IMAGE_DIMENSION = 1920;
+const IMAGE_QUALITY = 85;
+const API_TIMEOUT = 30000; // 30 seconds
+
+/**
+ * Processes credential image and retrieves user simulation data
+ * @param {Buffer} imageBuffer - Image buffer to process
+ * @param {string} telefono - User's phone number
+ * @returns {Promise<object>} Processing result with user data and simulation
+ * @property {boolean} success - Whether processing was successful
+ * @property {string} [numeroAfiliacion] - User's affiliation number
+ * @property {string} [numeroFolio] - User's folio number
+ * @property {string} [numPensionado] - Pensioner number if applicable
+ * @property {string} [tipoCredencial] - Credential type (A=Active, P=Pensioner)
+ * @property {Array} [simulacion] - Simulation data array
+ * @property {string} [error] - Error message if failed
+ * @property {string} [mensaje] - User-friendly error message
+ */
 async function procesarCredencial(imageBuffer, telefono) {
   try {
     // Optimizar imagen
     const optimizedImage = await sharp(imageBuffer)
-      .resize(1920, 1920, {
+      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
         fit: "inside",
         withoutEnlargement: true,
       })
-      .jpeg({ quality: 85 })
+      .jpeg({ quality: IMAGE_QUALITY })
       .toBuffer();
 
     const formData = new FormData();
@@ -33,7 +59,7 @@ async function procesarCredencial(imageBuffer, telefono) {
         headers: {
           ...formData.getHeaders(),
         },
-        timeout: 30000,
+        timeout: API_TIMEOUT,
       }
     );
     //Con la respuesta del backend llamar a otro endpoint 
@@ -59,15 +85,10 @@ async function procesarCredencial(imageBuffer, telefono) {
         headers: {
           "Content-Type": "application/json",
         },
-        timeout: 30000,
+        timeout: API_TIMEOUT,
       }
     );
-   // console.log("Respuesta usuario backend:", responseUser.data);
-//        "tipoDerechohabiente": "A",
-//    "numAfiliacion": 11248,
-//    "saldo": 0,
-//    "sueldo": 9713,
-//    "fechaAjustada": "1996-06-02T00:00:00"
+    
     const rwDataUserSimulacion = {
       tipoDerechohabiente: tipoDerechohabiente,
       numAfiliacion: afiliacion,
@@ -75,8 +96,7 @@ async function procesarCredencial(imageBuffer, telefono) {
       saldo: responseUser.data.data.saldo,
       fechaAjustada: responseUser.data.data.fechaAjustada
     };
-    console.log("Datos para simulacion:", rwDataUserSimulacion);
-    console.log("Llamando a backend de simulacion...",BACKEND_SIMULACION_API_URL);
+    logger.debug(`Llamando a backend de simulacion: ${BACKEND_SIMULACION_API_URL}`);
     const responseSimulacion = await axios.post(
       BACKEND_SIMULACION_API_URL,
       rwDataUserSimulacion,
@@ -84,12 +104,10 @@ async function procesarCredencial(imageBuffer, telefono) {
         headers: {
           "Content-Type": "application/json",
         },
-        timeout: 30000,
+        timeout: API_TIMEOUT,
       }
     );
     const simulacionData = responseSimulacion.data.data || [];
-    console.log("Respuesta simulacion backend:", responseSimulacion.data);
-
     logger.info("✅ Imagen procesada correctamente");
 
     return {
@@ -119,6 +137,11 @@ async function procesarCredencial(imageBuffer, telefono) {
   }
 }
 
+/**
+ * Validates if image buffer is valid
+ * @param {Buffer} imageBuffer - Image buffer to validate
+ * @returns {Promise<boolean>} True if image is valid, false otherwise
+ */
 async function validarImagen(imageBuffer) {
   try {
     const metadata = await sharp(imageBuffer).metadata();
