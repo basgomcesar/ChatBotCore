@@ -62,12 +62,7 @@ async function procesarCredencial(imageBuffer, telefono) {
         timeout: 30000,
       }
     );
-   // console.log("Respuesta usuario backend:", responseUser.data);
-//        "tipoDerechohabiente": "A",
-//    "numAfiliacion": 11248,
-//    "saldo": 0,
-//    "sueldo": 9713,
-//    "fechaAjustada": "1996-06-02T00:00:00"
+    
     const rwDataUserSimulacion = {
       tipoDerechohabiente: tipoDerechohabiente,
       numAfiliacion: afiliacion,
@@ -75,8 +70,8 @@ async function procesarCredencial(imageBuffer, telefono) {
       saldo: responseUser.data.data.saldo,
       fechaAjustada: responseUser.data.data.fechaAjustada
     };
-    console.log("Datos para simulacion:", rwDataUserSimulacion);
-    console.log("Llamando a backend de simulacion...",BACKEND_SIMULACION_API_URL);
+    logger.debug(`Datos para simulacion: ${JSON.stringify(rwDataUserSimulacion)}`);
+    logger.debug(`Llamando a backend de simulacion: ${BACKEND_SIMULACION_API_URL}`);
     const responseSimulacion = await axios.post(
       BACKEND_SIMULACION_API_URL,
       rwDataUserSimulacion,
@@ -88,7 +83,7 @@ async function procesarCredencial(imageBuffer, telefono) {
       }
     );
     const simulacionData = responseSimulacion.data.data || [];
-    console.log("Respuesta simulacion backend:", responseSimulacion.data);
+    logger.debug(`Respuesta simulacion backend: ${JSON.stringify(responseSimulacion.data)}`);
 
     logger.info("✅ Imagen procesada correctamente");
 

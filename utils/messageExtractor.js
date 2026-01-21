@@ -33,7 +33,7 @@ async function extractMessageContent(sock, msg) {
       text = "[IMAGEN_RECIBIDA]"; 
       
       const from = msg.key.remoteJid;
-      logger.info(`📷 Imagen recibida de ${from}, tamaño: ${imageBuffer. length} bytes`);
+      logger.info(`📷 Imagen recibida de ${from}, tamaño: ${imageBuffer.length} bytes`);
     } catch (error) {
       logger.error(`❌ Error descargando imagen: ${error.message}`);
       throw new Error("No se pudo descargar la imagen");
@@ -43,12 +43,12 @@ async function extractMessageContent(sock, msg) {
   else if (isDocument) {
     try {
       const documentBuffer = await downloadMedia(msg);  
-      const mimeType = msg.message. documentMessage.mimetype;
+      const mimeType = msg.message.documentMessage.mimetype;
       const fileName = msg.message.documentMessage.fileName;
       
       text = "[DOCUMENTO_RECIBIDO]";
       const from = msg.key.remoteJid;
-      logger.info(`📄 Documento recibido de ${from}:  ${fileName} (${mimeType}), tamaño: ${documentBuffer. length} bytes`);
+      logger.info(`📄 Documento recibido de ${from}: ${fileName} (${mimeType}), tamaño: ${documentBuffer.length} bytes`);
       
       return { 
         text, 
@@ -119,12 +119,12 @@ async function downloadMedia(msg) {
  */
 function shouldProcessMessage(msg, from) {
   // Ignore messages from self
-  if (! msg || !msg.message || msg.key.fromMe) {
+  if (!msg || !msg.message || msg.key.fromMe) {
     return false;
   }
 
   // Ignore group messages
-  if (from. endsWith("@g.us")) {
+  if (from.endsWith("@g.us")) {
     return false;
   }
 
@@ -137,7 +137,7 @@ function shouldProcessMessage(msg, from) {
  * @returns {string} Sender JID
  */
 function getSenderJid(msg) {
-  return msg.key. remoteJid;
+  return msg.key.remoteJid;
 }
 
 module.exports = {

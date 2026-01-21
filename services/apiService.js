@@ -19,7 +19,7 @@ async function getUser(telefono) {
     const response = await api.get(`/Derechohabiente/${telefono}`);
     return response.data;
   } catch (error) {
-    logger.error(" Error consultando usuario:", error.message);
+    logger.error("Error consultando usuario:", error.message);
     // En caso de no existir, devolvemos un objeto base
     return { nombre: "Invitado", telefono };
   }
@@ -34,7 +34,7 @@ async function setUserState({
   paso,
   folio = "",
   tipo = "",
-  nombre ,
+  nombre,
 }) {
   try {
     if (!telefono) throw new Error("El teléfono es requerido");
@@ -51,17 +51,16 @@ async function setUserState({
     return response.data;
   } catch (error) {
     if (error.response) {
-      console.error(
-        "❌ Error del backend:",
-        error.response.status,
-        error.response.data,
-        error
+      logger.error(
+        `❌ Error del backend: ${error.response.status}`,
+        error.response.data
       );
     } else if (error.request) {
-      console.error("❌ No hubo respuesta del servidor:", error.request);
+      logger.error("❌ No hubo respuesta del servidor:", error.request);
     } else {
-      console.error("❌ Error configurando la petición:", error.message);
+      logger.error("❌ Error configurando la petición:", error.message);
     }
+    return { success: false, error: error.message };
   }
 }
 
@@ -75,7 +74,7 @@ async function getUserState(telefono) {
     const response = await api.get(`/Derechohabiente/get-state/${telefono}`);
     return response.data;
   } catch (error) {
-    logger.error(" Error obteniendo estado del usuario:", error.message);
+    logger.error("Error obteniendo estado del usuario:", error.message);
     return { success: false, message: "No se pudo obtener el estado" };
   }
 }
