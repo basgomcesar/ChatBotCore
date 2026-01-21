@@ -1,8 +1,19 @@
+/**
+ * Event handlers for WhatsApp connection and messages
+ * @module eventHandlers
+ */
+
 const qrcode = require("qrcode-terminal");
 const { DisconnectReason } = require("@whiskeysockets/baileys");
 const messageHandler = require("./messageHandler");
 const logger = require("../config/logger");
 
+/**
+ * Registers event handlers for WhatsApp socket
+ * @param {object} sock - WhatsApp socket connection
+ * @param {Function} startSock - Function to restart socket on disconnect
+ * @description Sets up handlers for connection updates and incoming messages
+ */
 function registerEvents(sock, startSock) {
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;

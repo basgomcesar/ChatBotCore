@@ -1,7 +1,15 @@
+/**
+ * WhatsApp service for creating and managing socket connections
+ * @module whatsappService
+ */
+
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
 
-
-// Inicializa y exporta la conexión de WhatsApp
+/**
+ * Creates a WhatsApp Web socket connection
+ * @returns {Promise<object>} WhatsApp socket instance
+ * @description Initializes authentication state and creates a new socket connection
+ */
 async function createSocket() {
   const { state, saveCreds } = await useMultiFileAuthState("auth_info");
   const { version } = await fetchLatestBaileysVersion();

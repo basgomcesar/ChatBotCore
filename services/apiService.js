@@ -1,10 +1,16 @@
+/**
+ * API service for backend communication
+ * @module apiService
+ */
+
 const axios = require("axios");
 const logger = require("../config/logger");
 
 const API_URL = process.env.BACKEND_API_URL || "https://tu-backend/api";
 
 /**
- * Axios con configuración base
+ * Axios instance with base configuration
+ * @type {object}
  */
 const api = axios.create({
   baseURL: API_URL,
@@ -12,7 +18,9 @@ const api = axios.create({
 });
 
 /**
- * Obtiene los datos de un usuario por su número de teléfono
+ * Gets user data by phone number
+ * @param {string} telefono - User's phone number
+ * @returns {Promise<object>} User data or default guest object
  */
 async function getUser(telefono) {
   try {
@@ -26,7 +34,15 @@ async function getUser(telefono) {
 }
 
 /**
- *  Actualiza el estado (flujo y paso) del usuario en el backend
+ * Updates user state (flow and step) in the backend
+ * @param {object} params - User state parameters
+ * @param {string} params.telefono - User's phone number (required)
+ * @param {string} params.flujo - Current flow name
+ * @param {string} params.paso - Current step in flow
+ * @param {string} [params.folio=''] - User's folio number
+ * @param {string} [params.tipo=''] - User type
+ * @param {string} [params.nombre] - User's name
+ * @returns {Promise<object>} Response data or error object
  */
 async function setUserState({
   telefono,
@@ -65,7 +81,9 @@ async function setUserState({
 }
 
 /**
- * 📊 Obtiene el estado actual del usuario (flujo y paso)
+ * Gets current user state from backend
+ * @param {string} telefono - User's phone number
+ * @returns {Promise<object>} User state or error object
  */
 async function getUserState(telefono) {
   try {

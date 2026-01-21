@@ -1,8 +1,21 @@
+/**
+ * Bot initialization module
+ * @module bot
+ */
+
 const { createSocket } = require("./whatsappService");
 const { registerEvents } = require("./eventHandlers");
 
-//Crea el socket de comunicacion y 
+/**
+ * Initializes the WhatsApp bot
+ * @returns {Promise<void>}
+ * @description Creates socket connection and registers event handlers
+ */
 async function init() {
+  /**
+   * Starts a new socket connection with event handlers
+   * @returns {Promise<object>} Socket instance
+   */
   async function startSock() {
     const sock = await createSocket();
     registerEvents(sock, startSock);
