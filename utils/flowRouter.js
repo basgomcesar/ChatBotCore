@@ -13,18 +13,13 @@ const simulacionFlow = require("../flows/simulacionFlow/simulacionFlow");
 const llenadoSolicitudFlow = require("../flows/llenadoSolicitudFlow/llenadoSolicitudFlow");
 const logger = require("../config/logger");
 
-/**
- * Maps flow names to their respective handlers
- */
 const FLOW_HANDLERS = {
-  [FLOWS.BIENVENIDA.NAME]: welcomeFlow,
+  [FLOWS. BIENVENIDA. NAME]: welcomeFlow,
   [FLOWS.REQUISITOS.NAME]: requisitosFlow,
-  [FLOWS.PREGUNTAS_FRECUENTES.NAME]:preguntasFrecuentesFlow,
-  [FLOWS.ASESOR.NAME]: asesorFlow,
+  [FLOWS. PREGUNTAS_FRECUENTES. NAME]: preguntasFrecuentesFlow,
+  [FLOWS.ASESOR.NAME]:  asesorFlow,
   [FLOWS.SIMULACION.NAME]: simulacionFlow,
   [FLOWS.LLENADO_SOLICITUD.NAME]: llenadoSolicitudFlow,
-
-  // Add more flows here as needed
 };
 
 module.exports = {
@@ -33,18 +28,19 @@ module.exports = {
    * @param {string} userId - User ID (phone number)
    * @param {string} text - Received message text
    * @param {object} state - Current user state
+   * @param {object} messageData - Message data (text, imageBuffer, documentBuffer, etc.)
    * @returns {Promise<object>} Object containing reply, newState, and optionally file
    */
-  route: async (userId, text, state) => {
+  route:  async (userId, text, state, messageData = {}) => {
     const cleanText = text.trim().toLowerCase();
 
-    // 1. Check for global commands (menu, inicio, cancelar)
+    // 1. Check for global commands
     if (GLOBAL_COMMANDS.includes(cleanText)) {
       logger.info(`Usuario ${userId} ejecutó comando global: ${cleanText}`);
       userState.resetState(userId);
       return {
         reply: "🔙 Has regresado al menú principal",
-        newState: {
+        newState:  {
           flow: FLOWS.BIENVENIDA.NAME,
           step: FLOWS.BIENVENIDA.STEPS.MENU,
         },
@@ -55,23 +51,29 @@ module.exports = {
     const flowHandler =
       FLOW_HANDLERS[state.flow] || FLOW_HANDLERS[FLOWS.BIENVENIDA.NAME];
     
-    if (!flowHandler) {
-      logger.error(`No se encontró handler para el flujo: ${state.flow}`);
+    if (! flowHandler) {
+      logger.error(`No se encontró handler para el flujo: ${state. flow}`);
       return {
-        reply: "❌ Ocurrió un error interno. Intenta más tarde.",
+        reply: "❌ Ocurrió un error interno.  Intenta más tarde.",
         newState: {
-          flow: FLOWS.BIENVENIDA.NAME,
-          step: FLOWS.BIENVENIDA.STEPS.MENU,
+          flow: FLOWS. BIENVENIDA.NAME,
+          step: FLOWS.BIENVENIDA.STEPS. MENU,
         },
       };
     }
     
-    const { reply, newState, file } = await flowHandler.handle(userId, text, state);
+    // Pasar messageData completo al handler
+    const { reply, newState, file } = await flowHandler.handle(
+      userId, 
+      text, 
+      state, 
+      messageData
+    );
 
     return {
       reply,
       file,
-      newState: newState || state,
+      newState:  newState || state,
     };
   },
 };

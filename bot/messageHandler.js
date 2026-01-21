@@ -6,6 +6,11 @@
 const userState = require("../state/userState");
 const flowRouter = require("../utils/flowRouter");
 const logger = require("../config/logger");
+const { 
+  extractMessageContent, 
+  shouldProcessMessage, 
+  getSenderJid 
+} = require("../utils/messageExtractor");
 
 /**
  * Processes incoming messages and routes them to appropriate flows
@@ -15,14 +20,37 @@ const logger = require("../config/logger");
 module.exports = async (sock, m) => {
   try {
     const msg = m.messages?.[0];
-    if (!msg || !msg.message || msg.key.fromMe) return;
+    const from = getSenderJid(msg);
 
-    const from = msg.key.remoteJid;
-    const text =
-      msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+    if (!shouldProcessMessage(msg, from)) {
+      return;
+    }
 
-    if (!text || from.endsWith("@g.us")) return;
+    let text, imageBuffer, documentBuffer, messageType, mimeType, fileName;
+    
+    try {
+      ({ text, imageBuffer, documentBuffer, messageType, mimeType, fileName } = 
+        await extractMessageContent(sock, msg));
+    } catch (error) {
+      logger.error(`❌ Error extrayendo contenido del mensaje: ${error.message}`);
+      await sock.sendMessage(from, { 
+        text: "❌ No pude procesar tu mensaje. Por favor, intenta nuevamente." 
+      });
+      return;
+    }
+
+    if (! text) return;
+    
     logger.info(`📩 Mensaje de ${from}: ${text}`);
+
+    const messageData = {
+      text,
+      imageBuffer,
+      documentBuffer,
+      messageType,
+      mimeType,
+      fileName
+    };
 
     let reply, newState, file;
     let tries = 0;
@@ -36,16 +64,17 @@ module.exports = async (sock, m) => {
       ({ reply, newState, file } = await flowRouter.route(
         from,
         inputText,
-        state
+        state,
+        messageData 
       ));
 
       await userState.setState(from, newState);
 
       inputText = "";
       tries++;
-    } while (!reply && tries < MAX_TRANSITIONS);
+    } while (! reply && tries < MAX_TRANSITIONS);
 
-    // 5. Enviar mas de una respuesta si hay un array en lugar de un string
+    // Enviar respuestas
     if (Array.isArray(reply)) {
       for (const message of reply) {
         await sock.sendMessage(from, { text: message });
@@ -53,16 +82,22 @@ module.exports = async (sock, m) => {
     } else if (reply) {
       await sock.sendMessage(from, { text: reply });
     }
+    
     if (file) {
       await sock.sendMessage(from, file);
     }
+    
   } catch (error) {
     logger.error("Error procesando mensaje:", error);
-    // Attempt to send error message to user
+    
+    // Intentar enviar mensaje de error al usuario
     try {
-      await sock.sendMessage(from, { 
-        text: "❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta nuevamente o escribe 'menu' para regresar al inicio." 
-      });
+      const from = msg?. key?.remoteJid;
+      if (from) {
+        await sock.sendMessage(from, { 
+          text: "❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta nuevamente o escribe 'menu' para regresar al inicio." 
+        });
+      }
     } catch (sendError) {
       logger.error("Error enviando mensaje de error al usuario:", sendError);
     }

@@ -103,12 +103,13 @@ module.exports = {
    * @param {string} userId - User ID
    * @param {string} text - User input text
    * @param {object} state - Current user state
+   * @param {object} messageData - Message data (text, imageBuffer, documentBuffer, etc.)
    * @returns {Promise<object>} Object containing reply and newState
    */
-  handle: async (userId, text, state) => {
+  handle: async (userId, text, state, messageData = {}) => {
     const handler = stepHandlers[state.step];
     if (handler) {
-      return handler(userId, text, state);
+      return handler(userId, text, state, messageData);
     }
     return {
       reply: "❌ Paso no reconocido en el flujo de bienvenida.",

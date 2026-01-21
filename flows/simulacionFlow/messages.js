@@ -23,11 +23,41 @@ Cuando tengas los documentos listos, puedes volver a escribirme para iniciar la 
 Estoy aquí para ayudarte. 😊
 
 ⬅️ También puedes escribir menú para regresar al inicio cuando lo desees.`;
+const MSG_PROCESANDO_CREDENCIAL = () => `🔄 Procesando tu credencial... 
+Por favor espera un momento mientras analizo la imagen.`;
+
+const MSG_CREDENCIAL_PROCESADA = (numeroAfiliacion, tipo, simulacion) => `✅ ¡Credencial procesada exitosamente!  ✅
+
+📄 **Número de ${tipo === 'A' ? 'Afiliación' : 'Pensionado'}:** ${numeroAfiliacion}
+
+Estos son los resultados de la simulación de préstamo basados en tu información:
+
+${simulacion.map(sim => `
+💰 **Plazo: ${sim.plazo} meses**
+├─ Importe Cheque: $${sim.importeCheque.toFixed(2)}
+├─ Importe Líquido: $${sim.importeLiquido.toFixed(2)}
+└─ Descuento: $${sim.descuento.toFixed(2)}
+`).join('')}
+`;
+
+const MSG_ERROR_PROCESANDO_CREDENCIAL = (mensaje) => `❌ No pude procesar tu credencial. 
+
+**Motivo:** ${mensaje}
+
+Por favor, verifica que: 
+✔️ La imagen sea clara y legible
+✔️ Se vea completo el número de afiliación/pensionado
+✔️ La credencial esté bien iluminada
+
+Intenta enviar la foto nuevamente o escribe 'cancelar' para salir.`;
 
 module.exports = {
   REQ_SIMULACION_ACTIVO,
   REQ_SIMULACION_PENSIONADO,
   MSG_PREPARADO,
   MSG_INGRESE_CREDENCIAL,
-  MSG_NO_TE_PREOCUPES
+  MSG_NO_TE_PREOCUPES,
+  MSG_PROCESANDO_CREDENCIAL,
+  MSG_CREDENCIAL_PROCESADA,
+  MSG_ERROR_PROCESANDO_CREDENCIAL
 };
