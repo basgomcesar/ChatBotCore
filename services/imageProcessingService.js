@@ -49,30 +49,55 @@ async function uploadCredentialImage(optimizedImage) {
   return response.data;
 }
 
+/**
+ * Optimizes image for processing
+ * @param {Buffer} imageBuffer - Original image buffer
+ * @returns {Promise<Buffer>} Optimized image buffer
+ */
+async function optimizeImage(imageBuffer) {
+  return await sharp(imageBuffer)
+    .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: IMAGE_QUALITY })
+    .toBuffer();
+}
+
+/**
+ * Extracts credential data from API response
+ * @param {object} credentialData - API response data
+ * @returns {object} Object with afiliacion, folio, and tipoDerechohabiente
+ * @throws {Error} If required fields are missing
+ */
+function extractCredentialData(credentialData) {
+  const afiliacion = credentialData.afiliacion || credentialData.pensionado;
+  if (!afiliacion) {
+    throw new Error("No se encontró número de afiliación en la respuesta");
+  }
+
+  const folio = credentialData.folio;
+  if (!folio) {
+    throw new Error("No se encontró folio en la respuesta");
+  }
+
+  const tipoDerechohabiente = credentialData.pensionado ? "P" : "A";
+
+  return { afiliacion, folio, tipoDerechohabiente };
+}
+
+/**
+ * Processes credential for loan application
+ * @param {Buffer} imageBuffer - Credential image buffer
+ * @param {string} telefono - User's phone number
+ * @param {string} tipoPrestamo - Type of loan
+ * @returns {Promise<object>} User information
+ */
 async function procesarCredencialSolicitud(imageBuffer, telefono, tipoPrestamo) {
   try {
-    // Optimizar imagen
-    const optimizedImage = await sharp(imageBuffer)
-      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: IMAGE_QUALITY })
-      .toBuffer();
-
+    const optimizedImage = await optimizeImage(imageBuffer);
     const credentialData = await uploadCredentialImage(optimizedImage);
-
-    const afiliacion = credentialData.afiliacion || credentialData.pensionado;
-    if (!afiliacion) {
-      throw new Error("No se encontró número de afiliación en la respuesta");
-    }
-
-    const folio = credentialData.folio;
-    if (!folio) {
-      throw new Error("No se encontró folio en la respuesta");
-    }
-
-    const tipoDerechohabiente = credentialData.pensionado ? "P" : "A";
+    const { afiliacion, folio, tipoDerechohabiente } = extractCredentialData(credentialData);
 
     const rawDataUser = {
       numAfiliacion: afiliacion,
@@ -94,6 +119,12 @@ async function procesarCredencialSolicitud(imageBuffer, telefono, tipoPrestamo) 
   }
 }
 
+/**
+ * Processes credential manually with affiliation and folio
+ * @param {string} afiliacion - Affiliation number
+ * @param {string} folio - Folio number
+ * @returns {Promise<object>} User information
+ */
 async function procesarCredencialSolicitudManual(afiliacion, folio) {
   try {
     const tiposDerechohabiente = ['A', 'P'];
@@ -177,28 +208,9 @@ async function getSimulation(simulationData) {
  */
 async function procesarCredencial(imageBuffer, telefono) {
   try {
-    // Optimizar imagen
-    const optimizedImage = await sharp(imageBuffer)
-      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: IMAGE_QUALITY })
-      .toBuffer();
-
+    const optimizedImage = await optimizeImage(imageBuffer);
     const credentialData = await uploadCredentialImage(optimizedImage);
-
-    const afiliacion = credentialData.afiliacion || credentialData.pensionado;
-    if (!afiliacion) {
-      throw new Error("No se encontró número de afiliación en la respuesta");
-    }
-
-    const folio = credentialData.folio;
-    if (!folio) {
-      throw new Error("No se encontró folio en la respuesta");
-    }
-
-    const tipoDerechohabiente = credentialData.pensionado ? "P" : "A";
+    const { afiliacion, folio, tipoDerechohabiente } = extractCredentialData(credentialData);
 
     const rawDataUser = {
       numAfiliacion: afiliacion,
@@ -213,7 +225,7 @@ async function procesarCredencial(imageBuffer, telefono) {
       numAfiliacion: afiliacion,
       sueldo: userInfo.sueldo,
       saldo: userInfo.saldo,
-      fechaAjustada: userInfo.fechaAjustada
+      fechaAjustada: userInfo.fechaAjustada,
     };
 
     const simulacionData = await getSimulation(rwDataUserSimulacion);
@@ -226,9 +238,8 @@ async function procesarCredencial(imageBuffer, telefono) {
       numeroFolio: credentialData.folio,
       numPensionado: credentialData.pensionado,
       tipoCredencial: tipoDerechohabiente,
-      simulacion: simulacionData
+      simulacion: simulacionData,
     };
-
   } catch (error) {
     logger.error(`❌ Error procesando credencial: ${error.message}`);
 
@@ -269,5 +280,5 @@ module.exports = {
   procesarCredencial,
   validarImagen,
   procesarCredencialSolicitud,
-  procesarCredencialSolicitudManual
+  procesarCredencialSolicitudManual,
 };
