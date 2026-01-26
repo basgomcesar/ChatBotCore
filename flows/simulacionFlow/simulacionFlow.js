@@ -47,7 +47,6 @@ const stepHandlers = {
   [STEPS.VALIDACION_CREDENCIAL]: async (userId, text, state, messageData) => {
     // Aquí se manejaría la validación de la credencial enviada por el usuario
     const { imageBuffer, messageType } = messageData || {};
-    logger.debug(`imageBuffer: ${imageBuffer ? `${imageBuffer.length} bytes` : 'null'}`);
     logger.debug(`messageType: ${messageType}`);
     if (!imageBuffer || messageType !== "image") {
       return {

@@ -24,6 +24,7 @@ async function getState(userId) {
         folio: response.folio || null,
         userType: response.tipo || 0,
         name: response.nombre || "",
+        tipoPrestamo: response.tipoPrestamo || "",
       };
     }
 
@@ -55,6 +56,7 @@ async function setState(userId, newState) {
       paso: newState.step,
       folio: newState.folio ,
       tipo: newState.userType ,
+      tipoPrestamo: newState.tipoPrestamo || "",
     };
 
     await setUserState(payload);

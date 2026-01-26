@@ -27,3 +27,4 @@ build/
 coverage/
 auth_info/
 state/userState.json
+nodemon.json

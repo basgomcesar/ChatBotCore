@@ -23,18 +23,157 @@ const IMAGE_QUALITY = 85;
 const API_TIMEOUT = 30000; // 30 seconds
 
 /**
+ * Uploads credential image to processing API
+ * @param {Buffer} optimizedImage - Optimized image buffer
+ * @returns {Promise<object>} API response with credential data
+ */
+async function uploadCredentialImage(optimizedImage) {
+  const formData = new FormData();
+  formData.append("file", optimizedImage, {
+    filename: `credencial_${Date.now()}.jpg`,
+    contentType: "image/jpeg",
+  });
+
+  const response = await axios.post(
+    IMAGE_PROCESSING_API_URL,
+    formData,
+    {
+      headers: {
+        ...formData.getHeaders(),
+      },
+      timeout: API_TIMEOUT,
+    }
+  );
+
+  logger.info(`Respuesta del servicio de procesamiento de imagen recibida ${JSON.stringify(response.data)}`);
+  return response.data;
+}
+
+async function procesarCredencialSolicitud(imageBuffer, telefono, tipoPrestamo) {
+  try {
+    // Optimizar imagen
+    const optimizedImage = await sharp(imageBuffer)
+      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: IMAGE_QUALITY })
+      .toBuffer();
+
+    const credentialData = await uploadCredentialImage(optimizedImage);
+
+    const afiliacion = credentialData.afiliacion || credentialData.pensionado;
+    if (!afiliacion) {
+      throw new Error("No se encontró número de afiliación en la respuesta");
+    }
+
+    const folio = credentialData.folio;
+    if (!folio) {
+      throw new Error("No se encontró folio en la respuesta");
+    }
+
+    const tipoDerechohabiente = credentialData.pensionado ? "P" : "A";
+
+    const rawDataUser = {
+      numAfiliacion: afiliacion,
+      tipoDerechohabiente: tipoDerechohabiente,
+      folio: folio,
+    };
+
+    const userInfo = await getUserInfo(rawDataUser);
+    return userInfo;
+  } catch (error) {
+    logger.error(`❌ Error procesando credencial: ${error.message}`);
+    if (error.response) {
+      logger.error(
+        `Error backend ${error.response.status}`,
+        error.response.data
+      );
+    }
+    throw error;
+  }
+}
+
+async function procesarCredencialSolicitudManual(afiliacion, folio) {
+  try {
+    const tiposDerechohabiente = ['A', 'P'];
+    
+    for (const tipo of tiposDerechohabiente) {
+      try {
+        const rawDataUser = {
+          numAfiliacion: afiliacion,
+          folio: folio,
+          tipoDerechohabiente: tipo,
+        };
+        const userInfo = await getUserInfo(rawDataUser);
+        userInfo.folio = folio;
+        return userInfo;
+      } catch (error) {
+        logger.warn(`Fallo con tipoDerechohabiente ${tipo}: ${error.message}`);
+        if (tipo === tiposDerechohabiente[tiposDerechohabiente.length - 1]) {
+          throw error;
+        }
+      }
+    }
+  } catch (error) {
+    logger.error(`❌ Error procesando credencial manual: ${error.message}`);
+    if (error.response) {
+      logger.error(
+        `Error backend ${error.response.status}`,
+        error.response.data
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetches user information from backend API
+ * @param {object} userData - User data with affiliation and folio
+ * @returns {Promise<object>} User information including salary and balance
+ */
+async function getUserInfo(userData) {
+  const response = await axios.post(
+    BACKEND_API_USER_INFO_URL,
+    userData,
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      timeout: API_TIMEOUT,
+    }
+  );
+
+  return response.data.data;
+}
+
+/**
+ * Fetches simulation data from backend
+ * @param {object} simulationData - Data for simulation calculation
+ * @returns {Promise<Array>} Simulation data array
+ */
+async function getSimulation(simulationData) {
+  logger.debug(`Llamando a backend de simulacion: ${BACKEND_SIMULACION_API_URL}`);
+
+  const response = await axios.post(
+    BACKEND_SIMULACION_API_URL,
+    simulationData,
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      timeout: API_TIMEOUT,
+    }
+  );
+
+  return response.data.data || [];
+}
+
+/**
  * Processes credential image and retrieves user simulation data
  * @param {Buffer} imageBuffer - Image buffer to process
  * @param {string} telefono - User's phone number
  * @returns {Promise<object>} Processing result with user data and simulation
- * @property {boolean} success - Whether processing was successful
- * @property {string} [numeroAfiliacion] - User's affiliation number
- * @property {string} [numeroFolio] - User's folio number
- * @property {string} [numPensionado] - Pensioner number if applicable
- * @property {string} [tipoCredencial] - Credential type (A=Active, P=Pensioner)
- * @property {Array} [simulacion] - Simulation data array
- * @property {string} [error] - Error message if failed
- * @property {string} [mensaje] - User-friendly error message
  */
 async function procesarCredencial(imageBuffer, telefono) {
   try {
@@ -47,74 +186,45 @@ async function procesarCredencial(imageBuffer, telefono) {
       .jpeg({ quality: IMAGE_QUALITY })
       .toBuffer();
 
-    const formData = new FormData();
-    formData.append("file", optimizedImage, {
-      filename: `credencial_${Date.now()}.jpg`,
-      contentType: "image/jpeg",
-    });
-    const response = await axios.post(
-      IMAGE_PROCESSING_API_URL,
-      formData,
-      {
-        headers: {
-          ...formData.getHeaders(),
-        },
-        timeout: API_TIMEOUT,
-      }
-    );
-    //Con la respuesta del backend llamar a otro endpoint 
-    //preparando los datos para el usuario
-    const afiliacion = response.data.afiliacion || response.data.pensionado;
+    const credentialData = await uploadCredentialImage(optimizedImage);
+
+    const afiliacion = credentialData.afiliacion || credentialData.pensionado;
     if (!afiliacion) {
       throw new Error("No se encontró número de afiliación en la respuesta");
     }
-    const folio = response.data.folio;
+
+    const folio = credentialData.folio;
     if (!folio) {
       throw new Error("No se encontró folio en la respuesta");
     }
-    const tipoDerechohabiente = response.data.pensionado ? "P" : "A";
+
+    const tipoDerechohabiente = credentialData.pensionado ? "P" : "A";
+
     const rawDataUser = {
       numAfiliacion: afiliacion,
       tipoDerechohabiente: tipoDerechohabiente,
       folio: folio,
     };
-    const responseUser = await axios.post(
-      BACKEND_API_USER_INFO_URL,
-      rawDataUser,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: API_TIMEOUT,
-      }
-    );
-    
+
+    const userInfo = await getUserInfo(rawDataUser);
+
     const rwDataUserSimulacion = {
       tipoDerechohabiente: tipoDerechohabiente,
       numAfiliacion: afiliacion,
-      sueldo: responseUser.data.data.sueldo,
-      saldo: responseUser.data.data.saldo,
-      fechaAjustada: responseUser.data.data.fechaAjustada
+      sueldo: userInfo.sueldo,
+      saldo: userInfo.saldo,
+      fechaAjustada: userInfo.fechaAjustada
     };
-    logger.debug(`Llamando a backend de simulacion: ${BACKEND_SIMULACION_API_URL}`);
-    const responseSimulacion = await axios.post(
-      BACKEND_SIMULACION_API_URL,
-      rwDataUserSimulacion,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: API_TIMEOUT,
-      }
-    );
-    const simulacionData = responseSimulacion.data.data || [];
+
+    const simulacionData = await getSimulation(rwDataUserSimulacion);
+
     logger.info("✅ Imagen procesada correctamente");
 
     return {
       success: true,
-      numeroAfiliacion: response.data.afiliacion,
-      numeroFolio: response.data.folio,
-      numPensionado: response.data.pensionado,
+      numeroAfiliacion: credentialData.afiliacion,
+      numeroFolio: credentialData.folio,
+      numPensionado: credentialData.pensionado,
       tipoCredencial: tipoDerechohabiente,
       simulacion: simulacionData
     };
@@ -158,4 +268,6 @@ async function validarImagen(imageBuffer) {
 module.exports = {
   procesarCredencial,
   validarImagen,
+  procesarCredencialSolicitud,
+  procesarCredencialSolicitudManual
 };
