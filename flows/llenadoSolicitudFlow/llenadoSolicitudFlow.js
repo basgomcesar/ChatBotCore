@@ -136,7 +136,7 @@ const stepHandlers = {
           flow: FLOW_NAME,
           step: STEPS.CONFIRMAR_INFORMACION,
           tipoPrestamo: state.tipoPrestamo,
-          folio: folio,
+          folio,
           numeroAfiliacion: numAfiliacion,
         },
       };
