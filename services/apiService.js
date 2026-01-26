@@ -43,6 +43,7 @@ async function getUser(telefono) {
  * @param {string} [params.tipo=''] - User type
  * @param {string} [params.nombre] - User's name
  * @param {string} [params.tipoPrestamo] - Type of loan
+ * @param {string} [params.numeroAfiliacion] - Affiliation number
  * @returns {Promise<object>} Response data or error object
  */
 async function setUserState({
@@ -53,6 +54,7 @@ async function setUserState({
   tipo = "",
   nombre = "",
   tipoPrestamo = "",
+  numeroAfiliacion = ""
 }) {
   try {
     if (!telefono) throw new Error("El teléfono es requerido");
@@ -65,6 +67,7 @@ async function setUserState({
       tipo: String(tipo ?? ""),
       nombre: nombre ?? "",
       tipoPrestamo: tipoPrestamo ?? "",
+      numeroAfiliacion: numeroAfiliacion ?? ""
     };
     const response = await api.post(`/Derechohabiente/update-state`, payload);
     return response.data;

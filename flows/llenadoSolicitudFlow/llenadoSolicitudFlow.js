@@ -6,8 +6,9 @@
 
 const { FLOWS } = require("../../config/constants");
 const { preguntarTipoSolicitudPrestamo, pedirCredencialCortoPlazo, pedirCredencialMedianoPlazo, verificarSolicitudPrestamo } = require("./messages");
-const { procesarCredencial, procesarCredencialSolicitud,procesarCredencialSolicitudManual, validarImagen } = require("../../services/imageProcessingService");
+const { procesarCredencial, procesarCredencialSolicitud, procesarCredencialSolicitudManual, validarImagen } = require("../../services/imageProcessingService");
 const logger = require("../../config/logger");
+const { llenarSolicitudPDFActivos } = require("../../utils/llenadoSolicitud");
 
 // Centralize flow constants
 const FLOW_NAME = FLOWS.LLENADO_SOLICITUD.NAME;
@@ -32,20 +33,18 @@ const stepHandlers = {
       };
     } else {
       return {
-        reply: "Opción no válida. Por favor, selecciona 1️⃣ para Corto Plazo o 2️⃣ para Mediano Plazo.",
-        newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_INICIAL, tipoPrestamo: state.tipoPrestamo },
+        reply: "Opción no válida. \nPor favor, selecciona 1️⃣ para Corto Plazo o 2️⃣ para Mediano Plazo.",
+        newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_INICIAL, tipoPrestamo: state.tipoPrestamo, numeroAfiliacion: state.numeroAfiliacion },
       };
     }
   },
   [STEPS.PROCESAR_INFO_MANUALMENTE]: async (userId, text, state, messageData) => {
     const texto = text.trim().toLowerCase();
     const partes = texto.split(",");
-    console.log("Partes obtenidas para procesamiento manual:", partes);
     let numAfiliacion = null;
     let folio = null;
     partes.forEach(parte => {
       const [clave, valor] = parte.split(":").map(s => s.trim());
-      console.log(`Clave: ${clave}, Valor: ${valor}`);
       if (clave === "afiliacion" || clave === "pension") {
         numAfiliacion = valor;
       } else if (clave === "folio") {
@@ -54,13 +53,37 @@ const stepHandlers = {
     });
     if (numAfiliacion && folio) {
       // Aquí se podría llamar a una función para obtener más datos del usuario si es necesario
-      const infoUsuario = await procesarCredencialSolicitudManual( numAfiliacion, folio, state.tipoPrestamo);
+      const infoUsuario = await procesarCredencialSolicitudManual(numAfiliacion, folio, state.tipoPrestamo);
 
       return {
         reply: verificarSolicitudPrestamo(infoUsuario),
-        newState: { flow: FLOW_NAME, step: STEPS.PROCESAR_INFO_MANUALMENTE, tipoPrestamo: state.tipoPrestamo },
+        newState: { flow: FLOW_NAME, step: STEPS.CONFIRMAR_INFORMACION, tipoPrestamo: state.tipoPrestamo, folio: folio,numeroAfiliacion: numAfiliacion},
       };
     }
+  },
+  [STEPS.CONFIRMAR_INFORMACION]: async (userId, text, state, messageData) => {
+    const respuesta = text.trim().toLowerCase();
+    if (respuesta === "si") {
+      return {
+        newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_PDF },
+      };
+    } else if (respuesta === "no") {
+      return {
+        reply: "❌ Solicitud cancelada. Si deseas iniciar de nuevo, por favor selecciona la opción correspondiente en el menú.",
+        newState: { flow: FLOWS.BIENVENIDA.NAME, step: FLOWS.BIENVENIDA.STEPS.MENU },
+      };
+    }
+  },
+  [STEPS.LLENADO_SOLICITUD_PDF]: async (userId, text, state, messageData) => {
+    // Aquí se manejaría el llenado del PDF de la solicitud
+    const infoUsuario = await procesarCredencialSolicitudManual(state.numeroAfiliacion, state.folio, state.tipoPrestamo);
+    infoUsuario.folioSolicitud=state.folio;
+    const rutaPDF = await llenarSolicitudPDFActivos({ remitente: userId }, infoUsuario);
+
+    return {
+      file: rutaPDF,
+      newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_PDF },
+    };
   }
   ,
   [STEPS.PROCESAR_CREDENCIAL]: async (userId, text, state, messageData) => {
@@ -92,8 +115,6 @@ const stepHandlers = {
       }
       logger.info(`🔄 Procesando credencial para usuario ${userId}`);
       const resultado = await procesarCredencialSolicitud(imageBuffer, userId, state.tipoPrestamo);
-      console.log("Resultado del procesamiento de la credencial de solicitud:", resultado);
-
 
 
       if (resultado) {

@@ -25,6 +25,7 @@ async function getState(userId) {
         userType: response.tipo || 0,
         name: response.nombre || "",
         tipoPrestamo: response.tipoPrestamo || "",
+        numeroAfiliacion: response.numeroAfiliacion || ""
       };
     }
 
@@ -54,9 +55,10 @@ async function setState(userId, newState) {
       telefono: userId,
       flujo: newState.flow,
       paso: newState.step,
-      folio: newState.folio ,
-      tipo: newState.userType ,
-      tipoPrestamo: newState.tipoPrestamo || "",
+      folio: newState.folio || "",
+      tipo: newState.userType || "",
+      tipoPrestamo: newState.tipoPrestamo ,
+      numeroAfiliacion: newState.numeroAfiliacion ,
     };
 
     await setUserState(payload);
