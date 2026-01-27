@@ -106,6 +106,8 @@ async function procesarCredencialSolicitud(imageBuffer, telefono, tipoPrestamo) 
     };
 
     const userInfo = await getUserInfo(rawDataUser);
+    userInfo.folio = folio;
+    userInfo.numAfiliacion = userInfo.numAfiliacion.toString();
     return userInfo;
   } catch (error) {
     logger.error(`❌ Error procesando credencial: ${error.message}`);

@@ -12,6 +12,7 @@ const {
   pedirCredencialMedianoPlazo,
   verificarSolicitudPrestamo,
   verificarSolicitudPrestamoCPPensionado,
+  datosVerificadosSolicitudMedianoPlazoPensionado,
 } = require("./messages");
 const {
   procesarCredencialSolicitud,
@@ -132,7 +133,7 @@ const stepHandlers = {
         state.tipoPrestamo
       );
       //case user pensionado 
-      if (infoUsuario.tipoDerechohabiente === "P") {
+      if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
         return {
           reply: verificarSolicitudPrestamoCPPensionado(infoUsuario),
           newState: {
@@ -144,6 +145,17 @@ const stepHandlers = {
           },
         };
       }
+      if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo") {
+        console.log("Usuario pensionado solicitando mediano plazo");
+        return {
+          reply: ["✅ Datos verificados correctamente.",datosVerificadosSolicitudMedianoPlazoPensionado()],
+          newState: {
+            flow: FLOW_NAME,
+            step: STEPS.LLENADO_SOLICITUD_INICIAL,
+          },
+        };
+      }
+
       //case user activo mayor a 10 años
       //case user activo menor a 10 años ya validado en paso anterior
 
@@ -171,8 +183,10 @@ const stepHandlers = {
   },
   [STEPS.CONFIRMAR_INFORMACION]: async (userId, text, state, messageData) => {
     const respuesta = text.trim().toLowerCase();
+    console.log(`Usuario respondió en confirmar información: ${respuesta}`);
 
     if (respuesta === "si") {
+      console.log("Usuario confirmó la información. Generando solicitud...");
       return {
         newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_PDF },
       };
@@ -283,16 +297,27 @@ const stepHandlers = {
         };
       }
 
-      // Handle pensionado type
-      if (resultado.tipoDerechohabiente === "P") {
+      // Handle pensionado type y corto plazo
+      if (resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
         // Pensionado flow - to be implemented
+        //este es el estado que se envia al mensaje de verificacion de datos
         return {
-          reply:
-            "📋 Procesamiento para pensionados. Por favor, proporciona la información manualmente.\n\n" +
-            "Escribe 'afiliacion/pension' : 1234567 , 'folio': 8901234",
+          reply: verificarSolicitudPrestamoCPPensionado(resultado),
           newState: {
             flow: FLOW_NAME,
-            step: STEPS.PROCESAR_INFO_MANUALMENTE,
+            step: STEPS.CONFIRMAR_INFORMACION,
+            folio: resultado.folio,
+            numeroAfiliacion: resultado.numAfiliacion,
+          },
+        };
+      }
+      if(resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo"){
+        console.log("Usuario pensionado solicitando mediano plazo");
+        return {
+          reply: ["✅ Datos verificados correctamente.",datosVerificadosSolicitudMedianoPlazoPensionado()],
+          newState: {
+            flow: FLOW_NAME,
+            step: STEPS.LLENADO_SOLICITUD_INICIAL,
           },
         };
       }

@@ -5,7 +5,6 @@ const PREGUNTAR_TIPO_PRESTAMO = (nombre) => `
 Por favor elige una opción:  
 1️⃣ Corto Plazo  
 2️⃣ Mediano Plazo  
-3️⃣ Información General ℹ️
 `;
 
 // PERSONAL ACTIVO - CORTO PLAZO

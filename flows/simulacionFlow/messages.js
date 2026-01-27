@@ -34,9 +34,9 @@ Estos son los resultados de la simulación de préstamo basados en tu informaci�
 
 ${simulacion.map(sim => `
 💰 **Plazo: ${sim.plazo} meses**
-├─ Importe Cheque: $${sim.importeCheque.toFixed(2)}
-├─ Importe Líquido: $${sim.importeLiquido.toFixed(2)}
-└─ Descuento: $${sim.descuento.toFixed(2)}
+├─ Importe Cheque: $${sim.importeCheque.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+├─ Importe Líquido: $${sim.importeLiquido.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+└─ Descuento: $${sim.descuento.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 `).join('')}
 `;
 

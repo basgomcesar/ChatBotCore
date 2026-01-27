@@ -49,4 +49,10 @@ ${telefono ? `🔸 *Celular*: ${telefono}` : ''}
 
 ✅ *Por favor, confirma si deseas proceder con esta información.* Responde *SI* para continuar o *NO* para cancelar.
 `;
-module.exports = { preguntarTipoSolicitudPrestamo, pedirCredencialCortoPlazo, pedirCredencialMedianoPlazo, verificarSolicitudPrestamo, verificarSolicitudPrestamoCPPensionado };
+const datosVerificadosSolicitudMedianoPlazoPensionado = () => `🔢 ¿Cuántos avales deseas registrar?
+1️⃣ Uno
+2️⃣ Dos
+3️⃣ Tres
+
+Por favor, responde con el número correspondiente (1‑3).`;
+module.exports = { preguntarTipoSolicitudPrestamo, pedirCredencialCortoPlazo, pedirCredencialMedianoPlazo, verificarSolicitudPrestamo, verificarSolicitudPrestamoCPPensionado,datosVerificadosSolicitudMedianoPlazoPensionado };
