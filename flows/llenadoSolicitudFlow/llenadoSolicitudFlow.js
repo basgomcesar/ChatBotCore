@@ -11,6 +11,7 @@ const {
   pedirCredencialCortoPlazo,
   pedirCredencialMedianoPlazo,
   verificarSolicitudPrestamo,
+  verificarSolicitudPrestamoCPPensionado,
 } = require("./messages");
 const {
   procesarCredencialSolicitud,
@@ -18,7 +19,7 @@ const {
   validarImagen,
 } = require("../../services/imageProcessingService");
 const logger = require("../../config/logger");
-const { llenarSolicitudPDFActivos } = require("../../utils/llenadoSolicitud");
+const { llenarSolicitudPDFActivos, llenarSolicitudPDFPensionados } = require("../../utils/llenadoSolicitud");
 
 // Centralize flow constants
 const FLOW_NAME = FLOWS.LLENADO_SOLICITUD.NAME;
@@ -34,7 +35,7 @@ const MIN_QUINCENAS_SIN_AVAL = 240; // 10 years
  */
 function validateImageMessage(messageData) {
   const { imageBuffer, messageType } = messageData || {};
-  
+
   if (!imageBuffer || messageType !== "image") {
     return {
       reply:
@@ -47,7 +48,7 @@ function validateImageMessage(messageData) {
       },
     };
   }
-  
+
   return null;
 }
 
@@ -124,11 +125,28 @@ const stepHandlers = {
     const { numAfiliacion, folio } = parseManualInput(text);
 
     if (numAfiliacion && folio) {
+      // Despues de obtener los datos manuales, puedo verificar si esta pidiendo Corto o Mediano Plazo y si es activo o pensionado
       const infoUsuario = await procesarCredencialSolicitudManual(
         numAfiliacion,
         folio,
         state.tipoPrestamo
       );
+      //case user pensionado 
+      if (infoUsuario.tipoDerechohabiente === "P") {
+        return {
+          reply: verificarSolicitudPrestamoCPPensionado(infoUsuario),
+          newState: {
+            flow: FLOW_NAME,
+            step: STEPS.CONFIRMAR_INFORMACION,
+            tipoPrestamo: state.tipoPrestamo,
+            folio,
+            numeroAfiliacion: numAfiliacion,
+          },
+        };
+      }
+      //case user activo mayor a 10 años
+      //case user activo menor a 10 años ya validado en paso anterior
+
 
       return {
         reply: verificarSolicitudPrestamo(infoUsuario),
@@ -177,6 +195,7 @@ const stepHandlers = {
     };
   },
   [STEPS.LLENADO_SOLICITUD_PDF]: async (userId, text, state, messageData) => {
+    console.log("Generando PDF de solicitud...");
     const infoUsuario = await procesarCredencialSolicitudManual(
       state.numeroAfiliacion,
       state.folio,
@@ -184,13 +203,35 @@ const stepHandlers = {
     );
     infoUsuario.folioSolicitud = state.folio;
 
-    const rutaPDF = await llenarSolicitudPDFActivos(
-      { remitente: userId },
-      infoUsuario
-    );
+    let rutaPDF;
+    if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
+      rutaPDF = await llenarSolicitudPDFPensionados(
+        { remitente: userId },
+        infoUsuario
+      );
+      console.log("PDF generado en:", rutaPDF);
+    } else if (infoUsuario.tipoDerechohabiente === "A" && state.tipoPrestamo === "CortoPlazo" && infoUsuario.quincenasCotizadas >= MIN_QUINCENAS_SIN_AVAL) {
+      rutaPDF = await llenarSolicitudPDFActivos(
+        { remitente: userId },
+        infoUsuario
+      );
+      console.log("PDF generado en:", rutaPDF);
+    } else if (state.tipoPrestamo === "CortoPlazo" && infoUsuario.tipoDerechohabiente === "A" && infoUsuario.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL) {
+      return {
+        reply: "🔍 Detectamos que tu antigüedad es menor a 10 años. " +
+          "Para continuar, es necesario un aval en servicio activo. " +
+          "Por favor envía la credencial IPE del aval (foto clara frontal).",
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+        },
+      };
+    }
+    //Casos de Mediano Plazo y otros no implementados aun
 
     return {
       file: rutaPDF,
+      reply: "✅ Tu solicitud ha sido generada exitosamente.",
       newState: {
         flow: FLOWS.BIENVENIDA.NAME,
         step: FLOWS.BIENVENIDA.STEPS.MENU,
@@ -308,6 +349,62 @@ const stepHandlers = {
       };
     }
   },
+  [STEPS.PROCESAR_CREDENCIAL_AVAL]: async (userId, text, state, messageData) => {
+    // Similar implementation as PROCESAR_CREDENCIAL but for the guarantor
+    const { imageBuffer, messageType } = messageData || {};
+    logger.debug(`messageType: ${messageType}`);
+
+    // Validate image message
+    const imageValidationError = validateImageMessage(messageData);
+    if (imageValidationError) {
+      return imageValidationError;
+    }
+    try {
+      // Validate image format
+      const esImagenValida = await validarImagen(imageBuffer);
+      if (!esImagenValida) {
+        return {
+          reply:
+            "❌ El archivo enviado no es una imagen válida.\n\n" +
+            "Por favor, envía una foto en formato JPG o PNG.",
+          newState: {
+            flow: FLOW_NAME,
+            step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+          },
+        };
+      }
+
+      // Process guarantor credential
+      logger.info(`🔄 Procesando credencial de aval para usuario ${userId}`);
+      const resultado = await procesarCredencialSolicitud(
+        imageBuffer,
+        userId,
+        "CortoPlazo" // Assuming guarantor is always for short term loan
+      );
+      
+    } catch (error) {
+      logger.error(
+        `❌ Error inesperado procesando credencial de aval para ${userId}: ${error.message}`
+      );
+      return {
+        reply:
+          "❌ Error al procesar la imagen del aval. Por favor, intenta nuevamente.",
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+        },
+      };
+    }
+    // After processing the guarantor, proceed to generate the PDF
+    return {
+      reply: "✅ Aval procesado correctamente. Procediendo a generar la solicitud.",
+      newState: {
+        flow: FLOW_NAME,
+        step: STEPS.LLENADO_SOLICITUD_PDF,
+      },
+    };
+  },
+
 };
 
 module.exports = {

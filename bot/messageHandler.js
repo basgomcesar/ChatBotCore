@@ -67,7 +67,6 @@ module.exports = async (sock, m) => {
         state,
         messageData 
       ));
-
       await userState.setState(from, newState);
 
       inputText = "";
@@ -84,6 +83,7 @@ module.exports = async (sock, m) => {
     }
     
     if (file) {
+      console.log("Enviando archivo al usuario:", file.fileName);
       await sock.sendMessage(from, file);
     }
     

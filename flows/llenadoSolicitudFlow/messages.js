@@ -31,4 +31,22 @@ ${telefono ? `🔸 *Celular*: ${telefono}` : ''}
 
 ✅ *Por favor, confirma si deseas proceder con esta información.* Responde *SI* para continuar o *NO* para cancelar.
         `;
-module.exports = { preguntarTipoSolicitudPrestamo, pedirCredencialCortoPlazo, pedirCredencialMedianoPlazo, verificarSolicitudPrestamo };
+const verificarSolicitudPrestamoCPPensionado = ({ nombre, paterno, materno, numAfiliacion, folio, infoDomicilio, infoLaboral ,correo, telefono, dependencia, organismo, empleo }) => `
+📋 Solicitud de Préstamo a Corto Plazo para Pensionados
+🔸 *Nombre Completo*: ${nombre} ${paterno} ${materno}
+🔸 *Pensión*: ${numAfiliacion}
+🔸 *Folio*: ${folio}
+🔸 *Domicilio*: ${infoDomicilio.calle}
+🔸 *Colonia*: ${infoDomicilio.colonia}
+🔸 *Código Postal*: ${infoDomicilio.cp}
+🔸 *Municipio*: ${infoDomicilio.municipio}
+🔸 *Estado*: ${infoDomicilio.estado}
+${correo ? `🔸 *Correo Electrónico*: ${correo}` : ''}
+${telefono ? `🔸 *Celular*: ${telefono}` : ''}
+🔸 *Dependencia*: ${infoLaboral.dependencia}
+🔸 *Organismo*: ${infoLaboral.organismo}
+🔸 *Empleo*: ${infoLaboral.empleo}
+
+✅ *Por favor, confirma si deseas proceder con esta información.* Responde *SI* para continuar o *NO* para cancelar.
+`;
+module.exports = { preguntarTipoSolicitudPrestamo, pedirCredencialCortoPlazo, pedirCredencialMedianoPlazo, verificarSolicitudPrestamo, verificarSolicitudPrestamoCPPensionado };
