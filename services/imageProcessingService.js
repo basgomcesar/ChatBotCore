@@ -130,6 +130,7 @@ async function procesarCredencialSolicitud(imageBuffer, telefono, tipoPrestamo) 
 async function procesarCredencialSolicitudManual(afiliacion, folio) {
   try {
     const tiposDerechohabiente = ['A', 'P'];
+    logger.info(`Iniciando procesamiento manual de credencial para afiliacion: ${afiliacion}, folio: ${folio}`);
     
     for (const tipo of tiposDerechohabiente) {
       try {

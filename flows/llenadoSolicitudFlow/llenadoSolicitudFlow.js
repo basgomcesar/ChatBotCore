@@ -20,7 +20,7 @@ const {
   validarImagen,
 } = require("../../services/imageProcessingService");
 const logger = require("../../config/logger");
-const { llenarSolicitudPDFActivos, llenarSolicitudPDFPensionados } = require("../../utils/llenadoSolicitud");
+const { llenarSolicitudPDFActivos, llenarSolicitudPDFPensionados, llenarSolicitudPDFPensionadosMedianoPlazo } = require("../../utils/llenadoSolicitud");
 
 // Centralize flow constants
 const FLOW_NAME = FLOWS.LLENADO_SOLICITUD.NAME;
@@ -148,10 +148,10 @@ const stepHandlers = {
       if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo") {
         console.log("Usuario pensionado solicitando mediano plazo");
         return {
-          reply: ["✅ Datos verificados correctamente.",datosVerificadosSolicitudMedianoPlazoPensionado()],
+          reply: ["✅ Datos verificados correctamente.", datosVerificadosSolicitudMedianoPlazoPensionado()],
           newState: {
             flow: FLOW_NAME,
-            step: STEPS.LLENADO_SOLICITUD_INICIAL,
+            step: STEPS.PROCESAR_NUMEROS_AVALES,
           },
         };
       }
@@ -240,8 +240,17 @@ const stepHandlers = {
           step: STEPS.PROCESAR_CREDENCIAL_AVAL,
         },
       };
+    } else if (state.tipoPrestamo === "MedianoPlazo" && infoUsuario.tipoDerechohabiente === "P") {
+      // Llenado de PDF para pensionados en mediano plazo
+
+      rutaPDF = await llenarSolicitudPDFPensionadosMedianoPlazo(
+        infoUsuario,
+        state.avales
+      );
+
+      console.log("PDF generado en:", rutaPDF);
     }
-    //Casos de Mediano Plazo y otros no implementados aun
+
 
     return {
       file: rutaPDF,
@@ -297,33 +306,21 @@ const stepHandlers = {
         };
       }
 
-      // Handle pensionado type y corto plazo
-      if (resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
-        // Pensionado flow - to be implemented
-        //este es el estado que se envia al mensaje de verificacion de datos
-        return {
-          reply: verificarSolicitudPrestamoCPPensionado(resultado),
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.CONFIRMAR_INFORMACION,
-            folio: resultado.folio,
-            numeroAfiliacion: resultado.numAfiliacion,
-          },
-        };
-      }
-      if(resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo"){
+      if (resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo") {
         console.log("Usuario pensionado solicitando mediano plazo");
         return {
-          reply: ["✅ Datos verificados correctamente.",datosVerificadosSolicitudMedianoPlazoPensionado()],
+          reply: ["✅ Datos verificados correctamente.", datosVerificadosSolicitudMedianoPlazoPensionado()],
           newState: {
             flow: FLOW_NAME,
-            step: STEPS.LLENADO_SOLICITUD_INICIAL,
+            folio: resultado.folio,
+            numeroAfiliacion: resultado.numAfiliacion,
+            step: STEPS.PROCESAR_NUMEROS_AVALES,
           },
         };
       }
 
       // Handle activo type
-      if (resultado.tipoDerechohabiente === "A") {
+      if (resultado.tipoDerechohabiente === "A" && state.tipoPrestamo === "CortoPlazo") {
         // Check if user needs an aval (guarantor)
         if (resultado.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL) {
           return {
@@ -333,7 +330,8 @@ const stepHandlers = {
               "Por favor envía la credencial IPE del aval (foto clara frontal).",
             newState: {
               flow: FLOW_NAME,
-              step: STEPS.PROCESAR_CREDENCIAL,
+              step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+              cantidadAvalesRequeridos: 1,
             },
           };
         }
@@ -374,18 +372,56 @@ const stepHandlers = {
       };
     }
   },
+  [STEPS.PROCESAR_NUMEROS_AVALES]: async (userId, text, state, messageData) => {
+    const cantidad = parseInt(text.trim(), 10);
+
+    if (isNaN(cantidad) || cantidad <= 0) {
+      return {
+        reply:
+          "❌ Por favor, ingresa un número válido de avales requeridos (mayor a 0).",
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.PROCESAR_NUMEROS_AVALES,
+          cantidadAvalesRequeridos: cantidad,
+          avalesProcesados: 0,
+        },
+      };
+    }
+    return {
+      reply:
+        `🔍 Necesitamos procesar las credenciales IPE de tus ${cantidad} aval(es). ` +
+        `Por favor envía la credencial IPE del aval 1/${cantidad} (foto clara frontal).`,
+      newState: {
+        flow: FLOW_NAME,
+        step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+        cantidadAvalesRequeridos: cantidad,
+        avalesProcesados: 0,
+      },
+    };
+  }
+  ,
   [STEPS.PROCESAR_CREDENCIAL_AVAL]: async (userId, text, state, messageData) => {
-    // Similar implementation as PROCESAR_CREDENCIAL but for the guarantor
     const { imageBuffer, messageType } = messageData || {};
     logger.debug(`messageType: ${messageType}`);
 
     // Validate image message
     const imageValidationError = validateImageMessage(messageData);
     if (imageValidationError) {
-      return imageValidationError;
+      return {
+        ...imageValidationError,
+        newState: {
+          ...imageValidationError.newState,
+          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+          tipoPrestamo: state.tipoPrestamo,
+          infoSolicitante: state.infoSolicitante,
+          avales: state.avales || [],
+          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+          avalesProcesados: state.avalesProcesados || 0,
+        }
+      };
     }
+
     try {
-      // Validate image format
       const esImagenValida = await validarImagen(imageBuffer);
       if (!esImagenValida) {
         return {
@@ -395,18 +431,98 @@ const stepHandlers = {
           newState: {
             flow: FLOW_NAME,
             step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+            tipoPrestamo: state.tipoPrestamo,
+            infoSolicitante: state.infoSolicitante,
+            avales: state.avales || [],
+            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+            avalesProcesados: state.avalesProcesados || 0,
           },
         };
       }
 
-      // Process guarantor credential
-      logger.info(`🔄 Procesando credencial de aval para usuario ${userId}`);
       const resultado = await procesarCredencialSolicitud(
         imageBuffer,
         userId,
-        "CortoPlazo" // Assuming guarantor is always for short term loan
+        "CortoPlazo"
       );
-      
+
+      if (!resultado || !resultado.numAfiliacion) {
+        return {
+          reply: "❌ Error al procesar la imagen del aval. Por favor, intenta nuevamente.",
+          newState: {
+            flow: FLOW_NAME,
+            step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+            tipoPrestamo: state.tipoPrestamo,
+            avales: state.avales || [],
+            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+          },
+        };
+      }
+
+      // **EXTRAER SOLO LOS DATOS NECESARIOS DEL AVAL**
+      const datosAval = {
+        afiliacion: resultado.numAfiliacion || null,
+        folio: resultado.folio,
+        tipo: resultado.tipoDerechohabiente,
+      };
+
+      const avalesActualizados = [...(state.avales || []), datosAval];
+      logger.debug(`Avales actualizados: ${JSON.stringify(avalesActualizados)}`);
+      const cantidadAvalesRequeridos = avalesActualizados.length;
+
+      logger.info(`✅ Aval ${cantidadAvalesRequeridos} procesado: ${JSON.stringify(datosAval)}`);
+
+      // Verificar si ya procesamos todos los avales
+      logger.info(`🔄 Avales procesados: ${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos}`);
+      if (cantidadAvalesRequeridos <= state.cantidadAvalesRequeridos) {
+        logger.info(`🔄 Esperando credencial del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos || 0}`);
+        return {
+          reply:
+            `✅ Aval ${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos} procesado correctamente.\n\n` +
+            `📋 **Datos del aval:**\n` +
+            `- Tipo: ${datosAval.tipo === 'A' ? 'Activo' : 'Pensionado'}\n` +
+            `- Número: ${datosAval.numeroAfiliacion}\n` +
+            `- Folio: ${datosAval.folio}\n\n` +
+            `📸 Por favor, envía la credencial IPE del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos}.`,
+          newState: {
+            flow: FLOW_NAME,
+            step: cantidadAvalesRequeridos < state.cantidadAvalesRequeridos ? STEPS.PROCESAR_CREDENCIAL_AVAL : STEPS.LLENADO_SOLICITUD_PDF,
+            tipoPrestamo: state.tipoPrestamo,
+            infoSolicitante: state.infoSolicitante,
+            avales: avalesActualizados,
+            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+          },
+        };
+      }
+
+      // Todos los avales procesados, proceder a generar PDF
+      logger.info(`✅ Todos los avales (${cantidadAvalesRequeridos}) procesados. Generando solicitud...`);
+
+      // Crear resumen de avales para mostrar al usuario
+      const resumenAvales = avalesActualizados.map((aval, index) =>
+        `${index + 1}. ${aval.tipo === 'A' ? 'Activo' : 'Pensionado'} - ` +
+        `Núm: ${aval.numeroAfiliacion || aval.numeroPensionado} - ` +
+        `Folio: ${aval.folio}`
+      ).join('\n');
+
+      return {
+        reply:
+          `✅ Todos los avales han sido procesados correctamente (${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos}).\n\n` +
+          `📋 **Resumen de avales:**\n${resumenAvales}\n\n` +
+          `⏳ Procediendo a generar tu solicitud de préstamo...`,
+        newState: {
+          flow: FLOW_NAME,
+          step: STEPS.LLENADO_SOLICITUD_PDF,
+          tipoPrestamo: state.tipoPrestamo,
+          infoSolicitante: state.infoSolicitante,
+          avales: avalesActualizados,
+          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+          avalesProcesados: cantidadAvalesRequeridos,
+          folio: state.infoSolicitante?.folio || state.folio,
+          numeroAfiliacion: state.infoSolicitante?.numAfiliacion || state.numeroAfiliacion,
+        },
+      };
+
     } catch (error) {
       logger.error(
         `❌ Error inesperado procesando credencial de aval para ${userId}: ${error.message}`
@@ -417,17 +533,14 @@ const stepHandlers = {
         newState: {
           flow: FLOW_NAME,
           step: STEPS.PROCESAR_CREDENCIAL_AVAL,
+          tipoPrestamo: state.tipoPrestamo,
+          infoSolicitante: state.infoSolicitante,
+          avales: state.avales || [],
+          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
+          avalesProcesados: state.avalesProcesados || 0,
         },
       };
     }
-    // After processing the guarantor, proceed to generate the PDF
-    return {
-      reply: "✅ Aval procesado correctamente. Procediendo a generar la solicitud.",
-      newState: {
-        flow: FLOW_NAME,
-        step: STEPS.LLENADO_SOLICITUD_PDF,
-      },
-    };
   },
 
 };

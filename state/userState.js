@@ -25,7 +25,10 @@ async function getState(userId) {
         userType: response.tipo || 0,
         name: response.nombre || "",
         tipoPrestamo: response.tipoPrestamo || "",
-        numeroAfiliacion: response.numeroAfiliacion || ""
+        numeroAfiliacion: response.numeroAfiliacion || "",
+        cantidadAvalesRequeridos: response.cantidadAvalesRequeridos || 0,
+        numeroDeAvalesProcesados: response.numeroDeAvalesProcesados || 0,
+        avales: response.avales || [],
       };
     }
 
@@ -59,6 +62,9 @@ async function setState(userId, newState) {
       tipo: newState.userType || "",
       tipoPrestamo: newState.tipoPrestamo ,
       numeroAfiliacion: newState.numeroAfiliacion ,
+      cantidadAvalesRequeridos: newState.cantidadAvalesRequeridos || 0,
+      numeroDeAvalesProcesados: newState.numeroDeAvalesProcesados || 0,
+      avales: newState.avales || [],
     };
 
     await setUserState(payload);
