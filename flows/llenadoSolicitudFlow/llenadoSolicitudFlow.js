@@ -142,7 +142,9 @@ const stepHandlers = {
     if (respuesta === "si") {
       console.log("Usuario confirmó la información. Generando solicitud...");
       return {
-        newState: { flow: FLOW_NAME, step: STEPS.LLENADO_SOLICITUD_PDF },
+        newState: new SolicitudStateBuilder(state)
+          .setStep(STEPS.LLENADO_SOLICITUD_PDF)
+          .build(),
       };
     }
 
@@ -156,10 +158,9 @@ const stepHandlers = {
 
     return {
       reply: "Por favor, responde 'si' o 'no'.",
-      newState: {
-        flow: FLOW_NAME,
-        step: STEPS.CONFIRMAR_INFORMACION,
-      },
+      newState: new SolicitudStateBuilder(state)
+        .setStep(STEPS.CONFIRMAR_INFORMACION)
+        .build(),
     };
   },
   [STEPS.LLENADO_SOLICITUD_PDF]: async (userId, text, state, messageData) => {
@@ -263,27 +264,22 @@ const stepHandlers = {
       return {
         reply:
           "❌ Por favor, ingresa un número válido de avales requeridos (mayor a 0).",
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.PROCESAR_NUMEROS_AVALES,
-          cantidadAvalesRequeridos: cantidad,
-          avalesProcesados: 0,
-        },
+        newState: new SolicitudStateBuilder(state)
+          .setStep(STEPS.PROCESAR_NUMEROS_AVALES)
+          .build(),
       };
     }
     return {
       reply:
         `🔍 Necesitamos procesar las credenciales IPE de tus ${cantidad} aval(es). ` +
         `Por favor envía la credencial IPE del aval 1/${cantidad} (foto clara frontal).`,
-      newState: {
-        flow: FLOW_NAME,
-        step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-        cantidadAvalesRequeridos: cantidad,
-        avalesProcesados: 0,
-      },
+      newState: new SolicitudStateBuilder(state)
+        .setStep(STEPS.PROCESAR_CREDENCIAL_AVAL)
+        .setAvalesRequeridos(cantidad)
+        .setAvalesProcesados(0)
+        .build(),
     };
-  }
-  ,
+  },
   [STEPS.PROCESAR_CREDENCIAL_AVAL]: async (userId, text, state, messageData) => {
     // Perform complete image validation for aval
     const validationError = await performCompleteImageValidation(messageData, state, true);

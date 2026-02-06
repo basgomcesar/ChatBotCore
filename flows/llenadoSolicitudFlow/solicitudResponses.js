@@ -106,7 +106,6 @@ function createAvalProcessingResponse(avalData, avalesActualizados, state) {
       newState: {
         ...state,
         avales: avalesActualizados,
-        step: UserTypeStateBuilder.forActiveEmployeeWithAval(state).step,
       },
     };
   }

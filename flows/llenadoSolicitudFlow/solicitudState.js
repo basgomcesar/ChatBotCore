@@ -76,6 +76,14 @@ class SolicitudStateBuilder {
   }
 
   /**
+   * Sets number of processed avales
+   */
+  setAvalesProcesados(cantidad) {
+    this.avalesProcesados = cantidad;
+    return this;
+  }
+
+  /**
    * Sets applicant information
    */
   setInfoSolicitante(info) {
