@@ -11,70 +11,36 @@ const {
   pedirCredencialCortoPlazo,
   pedirCredencialMedianoPlazo,
   verificarSolicitudPrestamo,
-  verificarSolicitudPrestamoCPPensionado,
-  datosVerificadosSolicitudMedianoPlazoPensionado,
 } = require("./messages");
 const {
   procesarCredencialSolicitud,
   procesarCredencialSolicitudManual,
-  validarImagen,
 } = require("../../services/imageProcessingService");
 const logger = require("../../config/logger");
 const { llenarSolicitudPDFActivos, llenarSolicitudPDFPensionados, llenarSolicitudPDFPensionadosMedianoPlazo } = require("../../utils/llenadoSolicitud");
 
-// Centralize flow constants
-const FLOW_NAME = FLOWS.LLENADO_SOLICITUD.NAME;
-const STEPS = FLOWS.LLENADO_SOLICITUD.STEPS;
+// Import state management and validation utilities
+const { FLOW_NAME, STEPS, SolicitudStateBuilder, UserTypeStateBuilder, PDFGenerationStateBuilder } = require("./solicitudState");
+const {
+  performCompleteImageValidation,
+  validateManualInput,
+  determineUserTypeScenario,
+  needsAval,
+  MIN_QUINCENAS_SIN_AVAL,
+} = require("./solicitudValidations");
+const {
+  createPensionerShortTermResponse,
+  createPensionerMediumTermResponse,
+  createActiveEmployeeWithAvalResponse,
+  createActiveEmployeeNoAvalResponse,
+  createCredentialErrorResponse,
+  createUnknownUserTypeResponse,
+  createAvalProcessingResponse,
+  createAvalErrorResponse,
+  createPDFCompletionResponse,
+} = require("./solicitudResponses");
 
-// Validation constants
-const MIN_QUINCENAS_SIN_AVAL = 240; // 10 years
 
-/**
- * Validates if user sent an image message
- * @param {object} messageData - Message data containing imageBuffer and messageType
- * @returns {object|null} Error response if invalid, null if valid
- */
-function validateImageMessage(messageData) {
-  const { imageBuffer, messageType } = messageData || {};
-
-  if (!imageBuffer || messageType !== "image") {
-    return {
-      reply:
-        "❌ Por favor, envía una foto de tu credencial del IPE.\n\n" +
-        "La imagen debe ser clara y legible.\n\n" +
-        "Si deseas cancelar, escribe:  cancelar",
-      newState: {
-        flow: FLOW_NAME,
-        step: STEPS.PROCESAR_CREDENCIAL,
-      },
-    };
-  }
-
-  return null;
-}
-
-/**
- * Parses manual input for affiliation and folio numbers
- * @param {string} text - User input text
- * @returns {object} Object with numAfiliacion and folio properties
- */
-function parseManualInput(text) {
-  const texto = text.trim().toLowerCase();
-  const partes = texto.split(",");
-  let numAfiliacion = null;
-  let folio = null;
-
-  partes.forEach((parte) => {
-    const [clave, valor] = parte.split(":").map((s) => s.trim());
-    if (clave === "afiliacion" || clave === "pension") {
-      numAfiliacion = valor;
-    } else if (clave === "folio") {
-      folio = valor;
-    }
-  });
-
-  return { numAfiliacion, folio };
-}
 
 const stepHandlers = {
   [STEPS.LLENADO_SOLICITUD_INICIAL]: async (userId, text, state) => ({
@@ -123,63 +89,51 @@ const stepHandlers = {
     };
   },
   [STEPS.PROCESAR_INFO_MANUALMENTE]: async (userId, text, state, messageData) => {
-    const { numAfiliacion, folio } = parseManualInput(text);
+    const { numAfiliacion, folio, isValid } = validateManualInput(text);
 
-    if (numAfiliacion && folio) {
-      // Despues de obtener los datos manuales, puedo verificar si esta pidiendo Corto o Mediano Plazo y si es activo o pensionado
-      const infoUsuario = await procesarCredencialSolicitudManual(
-        numAfiliacion,
-        folio,
-        state.tipoPrestamo
-      );
-      //case user pensionado 
-      if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
-        return {
-          reply: verificarSolicitudPrestamoCPPensionado(infoUsuario),
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.CONFIRMAR_INFORMACION,
-            tipoPrestamo: state.tipoPrestamo,
-            folio,
-            numeroAfiliacion: numAfiliacion,
-          },
-        };
-      }
-      if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo") {
-        console.log("Usuario pensionado solicitando mediano plazo");
-        return {
-          reply: ["✅ Datos verificados correctamente.", datosVerificadosSolicitudMedianoPlazoPensionado()],
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_NUMEROS_AVALES,
-          },
-        };
-      }
-
-      //case user activo mayor a 10 años
-      //case user activo menor a 10 años ya validado en paso anterior
-
-
+    if (!isValid) {
       return {
-        reply: verificarSolicitudPrestamo(infoUsuario),
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.CONFIRMAR_INFORMACION,
-          tipoPrestamo: state.tipoPrestamo,
-          folio,
-          numeroAfiliacion: numAfiliacion,
-        },
+        reply:
+          "❌ Formato incorrecto. Por favor, usa el formato:\nafiliacion: 1234567, folio: 8901234",
+        newState: new SolicitudStateBuilder(state)
+          .setStep(STEPS.PROCESAR_INFO_MANUALMENTE)
+          .build(),
       };
     }
 
-    return {
-      reply:
-        "❌ Formato incorrecto. Por favor, usa el formato:\nafiliacion: 1234567, folio: 8901234",
-      newState: {
-        flow: FLOW_NAME,
-        step: STEPS.PROCESAR_INFO_MANUALMENTE,
-      },
-    };
+    // Process the credential manually
+    const infoUsuario = await procesarCredencialSolicitudManual(
+      numAfiliacion,
+      folio,
+      state.tipoPrestamo
+    );
+
+    // Determine user type scenario and create appropriate response
+    const scenario = determineUserTypeScenario(infoUsuario, state.tipoPrestamo);
+
+    switch (scenario) {
+      case "PENSIONER_SHORT_TERM":
+        return createPensionerShortTermResponse(infoUsuario, state);
+
+      case "PENSIONER_MEDIUM_TERM":
+        console.log("Usuario pensionado solicitando mediano plazo");
+        return createPensionerMediumTermResponse(infoUsuario, state);
+
+      case "ACTIVE_SHORT_TERM_NO_AVAL":
+      case "ACTIVE_SHORT_TERM_WITH_AVAL":
+        // Both cases handled the same way - show verification
+        return {
+          reply: verificarSolicitudPrestamo(infoUsuario),
+          newState: new SolicitudStateBuilder(state)
+            .setStep(STEPS.CONFIRMAR_INFORMACION)
+            .setNumeroAfiliacion(numAfiliacion)
+            .setFolio(folio)
+            .build(),
+        };
+
+      default:
+        return createUnknownUserTypeResponse(state);
+    }
   },
   [STEPS.CONFIRMAR_INFORMACION]: async (userId, text, state, messageData) => {
     const respuesta = text.trim().toLowerCase();
@@ -218,158 +172,88 @@ const stepHandlers = {
     infoUsuario.folioSolicitud = state.folio;
 
     let rutaPDF;
-    if (infoUsuario.tipoDerechohabiente === "P" && state.tipoPrestamo === "CortoPlazo") {
-      rutaPDF = await llenarSolicitudPDFPensionados(
-        { remitente: userId },
-        infoUsuario
-      );
-      console.log("PDF generado en:", rutaPDF);
-    } else if (infoUsuario.tipoDerechohabiente === "A" && state.tipoPrestamo === "CortoPlazo" && infoUsuario.quincenasCotizadas >= MIN_QUINCENAS_SIN_AVAL) {
-      rutaPDF = await llenarSolicitudPDFActivos(
-        { remitente: userId },
-        infoUsuario
-      );
-      console.log("PDF generado en:", rutaPDF);
-    } else if (state.tipoPrestamo === "CortoPlazo" && infoUsuario.tipoDerechohabiente === "A" && infoUsuario.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL) {
-      return {
-        reply: "🔍 Detectamos que tu antigüedad es menor a 10 años. " +
-          "Para continuar, es necesario un aval en servicio activo. " +
-          "Por favor envía la credencial IPE del aval (foto clara frontal).",
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-        },
-      };
-    } else if (state.tipoPrestamo === "MedianoPlazo" && infoUsuario.tipoDerechohabiente === "P") {
-      // Llenado de PDF para pensionados en mediano plazo
+    
+    // Determine PDF type based on user type and loan type
+    const scenario = determineUserTypeScenario(infoUsuario, state.tipoPrestamo);
+    
+    switch (scenario) {
+      case "PENSIONER_SHORT_TERM":
+        rutaPDF = await llenarSolicitudPDFPensionados(
+          { remitente: userId },
+          infoUsuario
+        );
+        console.log("PDF generado en:", rutaPDF);
+        break;
 
-      rutaPDF = await llenarSolicitudPDFPensionadosMedianoPlazo(
-        infoUsuario,
-        state.avales
-      );
+      case "ACTIVE_SHORT_TERM_NO_AVAL":
+        rutaPDF = await llenarSolicitudPDFActivos(
+          { remitente: userId },
+          infoUsuario
+        );
+        console.log("PDF generado en:", rutaPDF);
+        break;
 
-      console.log("PDF generado en:", rutaPDF);
+      case "ACTIVE_SHORT_TERM_WITH_AVAL":
+        return createActiveEmployeeWithAvalResponse(state);
+
+      case "PENSIONER_MEDIUM_TERM":
+        rutaPDF = await llenarSolicitudPDFPensionadosMedianoPlazo(
+          infoUsuario,
+          state.avales
+        );
+        console.log("PDF generado en:", rutaPDF);
+        break;
+
+      default:
+        // Unknown scenario - should not happen
+        return createUnknownUserTypeResponse(state);
     }
 
-
-    return {
-      file: rutaPDF,
-      reply: "✅ Tu solicitud ha sido generada exitosamente.",
-      newState: {
-        flow: FLOWS.BIENVENIDA.NAME,
-        step: FLOWS.BIENVENIDA.STEPS.MENU,
-      },
-    };
+    return createPDFCompletionResponse(rutaPDF);
   },
   [STEPS.PROCESAR_CREDENCIAL]: async (userId, text, state, messageData) => {
-    const { imageBuffer, messageType } = messageData || {};
-    logger.debug(`messageType: ${messageType}`);
-
-    // Validate image message
-    const imageValidationError = validateImageMessage(messageData);
-    if (imageValidationError) {
-      return imageValidationError;
+    // Perform complete image validation
+    const validationError = await performCompleteImageValidation(messageData, state, false);
+    if (validationError) {
+      return validationError;
     }
 
     try {
-      // Validate image format
-      const esImagenValida = await validarImagen(imageBuffer);
-      if (!esImagenValida) {
-        return {
-          reply:
-            "❌ El archivo enviado no es una imagen válida.\n\n" +
-            "Por favor, envía una foto en formato JPG o PNG.",
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_CREDENCIAL,
-          },
-        };
-      }
-
       // Process credential
       logger.info(`🔄 Procesando credencial para usuario ${userId}`);
       const resultado = await procesarCredencialSolicitud(
-        imageBuffer,
+        messageData.imageBuffer,
         userId,
         state.tipoPrestamo
       );
 
       if (!resultado) {
-        return {
-          reply:
-            "❌ Error al procesar la imagen. Por favor, intenta ingresando la información manualmente. \n\n" +
-            "Escribe 'afiliacion/pension' : 1234567 , 'folio': 8901234",
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_INFO_MANUALMENTE,
-          },
-        };
+        return createCredentialErrorResponse(state);
       }
 
-      if (resultado.tipoDerechohabiente === "P" && state.tipoPrestamo === "MedianoPlazo") {
-        console.log("Usuario pensionado solicitando mediano plazo");
-        return {
-          reply: ["✅ Datos verificados correctamente.", datosVerificadosSolicitudMedianoPlazoPensionado()],
-          newState: {
-            flow: FLOW_NAME,
-            folio: resultado.folio,
-            numeroAfiliacion: resultado.numAfiliacion,
-            step: STEPS.PROCESAR_NUMEROS_AVALES,
-          },
-        };
+      // Determine user type scenario and create appropriate response
+      const scenario = determineUserTypeScenario(resultado, state.tipoPrestamo);
+
+      switch (scenario) {
+        case "PENSIONER_MEDIUM_TERM":
+          console.log("Usuario pensionado solicitando mediano plazo");
+          return createPensionerMediumTermResponse(resultado, state);
+
+        case "ACTIVE_SHORT_TERM_WITH_AVAL":
+          return createActiveEmployeeWithAvalResponse(state);
+
+        case "ACTIVE_SHORT_TERM_NO_AVAL":
+          return createActiveEmployeeNoAvalResponse(resultado, state);
+
+        case "UNKNOWN":
+        default:
+          return createUnknownUserTypeResponse(state);
       }
-
-      // Handle activo type
-      if (resultado.tipoDerechohabiente === "A" && state.tipoPrestamo === "CortoPlazo") {
-        // Check if user needs an aval (guarantor)
-        if (resultado.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL) {
-          return {
-            reply:
-              "🔍 Detectamos que tu antigüedad es menor a 10 años. " +
-              "Para continuar, es necesario un aval en servicio activo. " +
-              "Por favor envía la credencial IPE del aval (foto clara frontal).",
-            newState: {
-              flow: FLOW_NAME,
-              step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-              cantidadAvalesRequeridos: 1,
-            },
-          };
-        }
-
-        // User meets requirements
-        return {
-          reply: verificarSolicitudPrestamo(resultado),
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_INFO_MANUALMENTE,
-          },
-        };
-      }
-
-      // Unknown type
-      return {
-        reply:
-          "❌ No se pudo determinar el tipo de derechohabiente. " +
-          "Por favor, intenta ingresando la información manualmente.\n\n" +
-          "Escribe 'afiliacion/pension' : 1234567 , 'folio': 8901234",
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.PROCESAR_INFO_MANUALMENTE,
-        },
-      };
     } catch (error) {
       logger.error(
         `❌ Error inesperado procesando credencial para ${userId}: ${error.message}`
       );
-      return {
-        reply:
-          "❌ Error al procesar la imagen. Por favor, intenta ingresando la información manualmente. \n\n" +
-          "Escribe 'afiliacion/pension' : 1234567 , 'folio': 8901234",
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.PROCESAR_INFO_MANUALMENTE,
-        },
-      };
+      return createCredentialErrorResponse(state);
     }
   },
   [STEPS.PROCESAR_NUMEROS_AVALES]: async (userId, text, state, messageData) => {
@@ -401,65 +285,24 @@ const stepHandlers = {
   }
   ,
   [STEPS.PROCESAR_CREDENCIAL_AVAL]: async (userId, text, state, messageData) => {
-    const { imageBuffer, messageType } = messageData || {};
-    logger.debug(`messageType: ${messageType}`);
-
-    // Validate image message
-    const imageValidationError = validateImageMessage(messageData);
-    if (imageValidationError) {
-      return {
-        ...imageValidationError,
-        newState: {
-          ...imageValidationError.newState,
-          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-          tipoPrestamo: state.tipoPrestamo,
-          infoSolicitante: state.infoSolicitante,
-          avales: state.avales || [],
-          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-          avalesProcesados: state.avalesProcesados || 0,
-        }
-      };
+    // Perform complete image validation for aval
+    const validationError = await performCompleteImageValidation(messageData, state, true);
+    if (validationError) {
+      return validationError;
     }
 
     try {
-      const esImagenValida = await validarImagen(imageBuffer);
-      if (!esImagenValida) {
-        return {
-          reply:
-            "❌ El archivo enviado no es una imagen válida.\n\n" +
-            "Por favor, envía una foto en formato JPG o PNG.",
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-            tipoPrestamo: state.tipoPrestamo,
-            infoSolicitante: state.infoSolicitante,
-            avales: state.avales || [],
-            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-            avalesProcesados: state.avalesProcesados || 0,
-          },
-        };
-      }
-
       const resultado = await procesarCredencialSolicitud(
-        imageBuffer,
+        messageData.imageBuffer,
         userId,
         "CortoPlazo"
       );
 
       if (!resultado || !resultado.numAfiliacion) {
-        return {
-          reply: "❌ Error al procesar la imagen del aval. Por favor, intenta nuevamente.",
-          newState: {
-            flow: FLOW_NAME,
-            step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-            tipoPrestamo: state.tipoPrestamo,
-            avales: state.avales || [],
-            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-          },
-        };
+        return createAvalErrorResponse(state);
       }
 
-      // **EXTRAER SOLO LOS DATOS NECESARIOS DEL AVAL**
+      // Extract only necessary data from aval
       const datosAval = {
         afiliacion: resultado.numAfiliacion || null,
         folio: resultado.folio,
@@ -468,78 +311,19 @@ const stepHandlers = {
 
       const avalesActualizados = [...(state.avales || []), datosAval];
       logger.debug(`Avales actualizados: ${JSON.stringify(avalesActualizados)}`);
-      const cantidadAvalesRequeridos = avalesActualizados.length;
+      
+      const cantidadProcesada = avalesActualizados.length;
+      logger.info(`✅ Aval ${cantidadProcesada} procesado: ${JSON.stringify(datosAval)}`);
+      logger.info(`🔄 Avales procesados: ${cantidadProcesada}/${state.cantidadAvalesRequeridos}`);
 
-      logger.info(`✅ Aval ${cantidadAvalesRequeridos} procesado: ${JSON.stringify(datosAval)}`);
-
-      // Verificar si ya procesamos todos los avales
-      logger.info(`🔄 Avales procesados: ${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos}`);
-      if (cantidadAvalesRequeridos <= state.cantidadAvalesRequeridos) {
-        logger.info(`🔄 Esperando credencial del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos || 0}`);
-        return {
-          reply:
-            `✅ Aval ${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos} procesado correctamente.\n\n` +
-            `📋 **Datos del aval:**\n` +
-            `- Tipo: ${datosAval.tipo === 'A' ? 'Activo' : 'Pensionado'}\n` +
-            `- Número: ${datosAval.numeroAfiliacion}\n` +
-            `- Folio: ${datosAval.folio}\n\n` +
-            `📸 Por favor, envía la credencial IPE del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos}.`,
-          newState: {
-            flow: FLOW_NAME,
-            step: cantidadAvalesRequeridos < state.cantidadAvalesRequeridos ? STEPS.PROCESAR_CREDENCIAL_AVAL : STEPS.LLENADO_SOLICITUD_PDF,
-            tipoPrestamo: state.tipoPrestamo,
-            infoSolicitante: state.infoSolicitante,
-            avales: avalesActualizados,
-            cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-          },
-        };
-      }
-
-      // Todos los avales procesados, proceder a generar PDF
-      logger.info(`✅ Todos los avales (${cantidadAvalesRequeridos}) procesados. Generando solicitud...`);
-
-      // Crear resumen de avales para mostrar al usuario
-      const resumenAvales = avalesActualizados.map((aval, index) =>
-        `${index + 1}. ${aval.tipo === 'A' ? 'Activo' : 'Pensionado'} - ` +
-        `Núm: ${aval.numeroAfiliacion || aval.numeroPensionado} - ` +
-        `Folio: ${aval.folio}`
-      ).join('\n');
-
-      return {
-        reply:
-          `✅ Todos los avales han sido procesados correctamente (${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos}).\n\n` +
-          `📋 **Resumen de avales:**\n${resumenAvales}\n\n` +
-          `⏳ Procediendo a generar tu solicitud de préstamo...`,
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.LLENADO_SOLICITUD_PDF,
-          tipoPrestamo: state.tipoPrestamo,
-          infoSolicitante: state.infoSolicitante,
-          avales: avalesActualizados,
-          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-          avalesProcesados: cantidadAvalesRequeridos,
-          folio: state.infoSolicitante?.folio || state.folio,
-          numeroAfiliacion: state.infoSolicitante?.numAfiliacion || state.numeroAfiliacion,
-        },
-      };
+      // Create response using the response builder
+      return createAvalProcessingResponse(datosAval, avalesActualizados, state);
 
     } catch (error) {
       logger.error(
         `❌ Error inesperado procesando credencial de aval para ${userId}: ${error.message}`
       );
-      return {
-        reply:
-          "❌ Error al procesar la imagen del aval. Por favor, intenta nuevamente.",
-        newState: {
-          flow: FLOW_NAME,
-          step: STEPS.PROCESAR_CREDENCIAL_AVAL,
-          tipoPrestamo: state.tipoPrestamo,
-          infoSolicitante: state.infoSolicitante,
-          avales: state.avales || [],
-          cantidadAvalesRequeridos: state.cantidadAvalesRequeridos,
-          avalesProcesados: state.avalesProcesados || 0,
-        },
-      };
+      return createAvalErrorResponse(state);
     }
   },
 
