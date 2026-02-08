@@ -28,3 +28,5 @@ coverage/
 auth_info/
 state/userState.json
 nodemon.json
+archivos/solicitud_mediano_plazo_*.pdf
+archivos/solicitud_cplazo_conaval_*.pdf
