@@ -20,7 +20,7 @@ const {
   validarImagen,
 } = require("../../services/imageProcessingService");
 const logger = require("../../config/logger");
-const { llenarSolicitudPDFActivos, llenarSolicitudPDFPensionados, llenarSolicitudPDFPensionadosMedianoPlazo } = require("../../utils/llenadoSolicitud");
+const { llenarSolicitudPDFActivos,llenarSolicitudPDFActivosConAval, llenarSolicitudPDFPensionados, llenarSolicitudPDFPensionadosMedianoPlazo, llenarSolicitudPDFActivosMedianoPlazo } = require("../../utils/llenadoSolicitud");
 
 // Centralize flow constants
 const FLOW_NAME = FLOWS.LLENADO_SOLICITUD.NAME;
@@ -230,7 +230,7 @@ const stepHandlers = {
         infoUsuario
       );
       console.log("PDF generado en:", rutaPDF);
-    } else if (state.tipoPrestamo === "CortoPlazo" && infoUsuario.tipoDerechohabiente === "A" && infoUsuario.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL) {
+    } else if (state.tipoPrestamo === "CortoPlazo" && infoUsuario.tipoDerechohabiente === "A" && infoUsuario.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL && !state.avales) {
       return {
         reply: "🔍 Detectamos que tu antigüedad es menor a 10 años. " +
           "Para continuar, es necesario un aval en servicio activo. " +
@@ -240,14 +240,28 @@ const stepHandlers = {
           step: STEPS.PROCESAR_CREDENCIAL_AVAL,
         },
       };
-    } else if (state.tipoPrestamo === "MedianoPlazo" && infoUsuario.tipoDerechohabiente === "P") {
-      // Llenado de PDF para pensionados en mediano plazo
+    } else if (state.tipoPrestamo === "CortoPlazo" && infoUsuario.tipoDerechohabiente === "A" && infoUsuario.quincenasCotizadas < MIN_QUINCENAS_SIN_AVAL && state.avales) {
+      console.log("Generando PDF para activo en corto plazo con avales:", state.avales);
+      rutaPDF = await llenarSolicitudPDFActivosConAval(
+        infoUsuario,
+        state.avales[0]
+      );
+      console.log("PDF generado en:", rutaPDF);
 
+    }else if (state.tipoPrestamo === "MedianoPlazo" && infoUsuario.tipoDerechohabiente === "P") {
+      // Llenado de PDF para pensionados en mediano plazo
       rutaPDF = await llenarSolicitudPDFPensionadosMedianoPlazo(
         infoUsuario,
         state.avales
       );
-
+      console.log("PDF generado en:", rutaPDF);
+    } else if (state.tipoPrestamo === "MedianoPlazo" && infoUsuario.tipoDerechohabiente === "A") {
+      // Llenado de PDF para activos en mediano plazo
+      console.log("Generando PDF para activo en mediano plazo con avales:", state.avales);
+      rutaPDF = await llenarSolicitudPDFActivosMedianoPlazo(
+        infoUsuario,
+        state.avales
+      );
       console.log("PDF generado en:", rutaPDF);
     }
 
@@ -263,9 +277,7 @@ const stepHandlers = {
   },
   [STEPS.PROCESAR_CREDENCIAL]: async (userId, text, state, messageData) => {
     const { imageBuffer, messageType } = messageData || {};
-    logger.debug(`messageType: ${messageType}`);
 
-    // Validate image message
     const imageValidationError = validateImageMessage(messageData);
     if (imageValidationError) {
       return imageValidationError;
@@ -330,6 +342,8 @@ const stepHandlers = {
               "Por favor envía la credencial IPE del aval (foto clara frontal).",
             newState: {
               flow: FLOW_NAME,
+              folio: resultado.folio,
+              numeroAfiliacion: resultado.numAfiliacion,
               step: STEPS.PROCESAR_CREDENCIAL_AVAL,
               cantidadAvalesRequeridos: 1,
             },
@@ -342,6 +356,18 @@ const stepHandlers = {
           newState: {
             flow: FLOW_NAME,
             step: STEPS.PROCESAR_INFO_MANUALMENTE,
+          },
+        };
+      } else if (resultado.tipoDerechohabiente === "A" && state.tipoPrestamo === "MedianoPlazo") {
+        console.log("Usuario activo solicitando mediano plazo");
+        //Datos verificados correctamente, solicitar número de avales requeridos
+        return {
+          reply: ["✅ Datos verificados correctamente.", "¿Cuántos avales en servicio activo vas a proporcionar? Por favor ingresa un número."],
+          newState: {
+            flow: FLOW_NAME,
+            numeroAfiliacion: resultado.numAfiliacion,
+            folio: resultado.folio,
+            step: STEPS.PROCESAR_NUMEROS_AVALES,
           },
         };
       }
@@ -402,9 +428,7 @@ const stepHandlers = {
   ,
   [STEPS.PROCESAR_CREDENCIAL_AVAL]: async (userId, text, state, messageData) => {
     const { imageBuffer, messageType } = messageData || {};
-    logger.debug(`messageType: ${messageType}`);
 
-    // Validate image message
     const imageValidationError = validateImageMessage(messageData);
     if (imageValidationError) {
       return {
@@ -481,9 +505,9 @@ const stepHandlers = {
             `✅ Aval ${cantidadAvalesRequeridos}/${state.cantidadAvalesRequeridos} procesado correctamente.\n\n` +
             `📋 **Datos del aval:**\n` +
             `- Tipo: ${datosAval.tipo === 'A' ? 'Activo' : 'Pensionado'}\n` +
-            `- Número: ${datosAval.numeroAfiliacion}\n` +
+            `- Número: ${datosAval.afiliacion}\n` +
             `- Folio: ${datosAval.folio}\n\n` +
-            `📸 Por favor, envía la credencial IPE del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos}.`,
+            cantidadAvalesRequeridos < state.cantidadAvalesRequeridos ? `📸 Por favor, envía la credencial IPE del aval ${cantidadAvalesRequeridos + 1}/${state.cantidadAvalesRequeridos}.` : "",
           newState: {
             flow: FLOW_NAME,
             step: cantidadAvalesRequeridos < state.cantidadAvalesRequeridos ? STEPS.PROCESAR_CREDENCIAL_AVAL : STEPS.LLENADO_SOLICITUD_PDF,
@@ -501,7 +525,7 @@ const stepHandlers = {
       // Crear resumen de avales para mostrar al usuario
       const resumenAvales = avalesActualizados.map((aval, index) =>
         `${index + 1}. ${aval.tipo === 'A' ? 'Activo' : 'Pensionado'} - ` +
-        `Núm: ${aval.numeroAfiliacion || aval.numeroPensionado} - ` +
+        `Núm: ${aval.afiliacion} - ` +
         `Folio: ${aval.folio}`
       ).join('\n');
 

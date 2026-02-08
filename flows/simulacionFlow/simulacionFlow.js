@@ -118,8 +118,8 @@ const stepHandlers = {
             resultado.simulacion
           ),
           newState: {
-            flow: FLOW_NAME,
-            step: STEPS.SOLICITAR_ESTADO_CUENTA,
+            flow: FLOWS.BIENVENIDA.NAME,
+            step: FLOWS.BIENVENIDA.STEPS.MENU,
             numeroAfiliacion: resultado.numeroAfiliacion,
             tipoCredencial: resultado.tipoCredencial,
           },
