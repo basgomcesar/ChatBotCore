@@ -16,7 +16,6 @@ const STEPS = FLOWS.ASESOR.STEPS;
 const stepHandlers = {
   [STEPS.ASESOR_INICIAL]: async (userId, text, state) => {
     if (!esHorarioDeAtencion()) {
-      // Outside business hours
       return {
         reply: mensajeAsesor(state.name),
         newState: {
